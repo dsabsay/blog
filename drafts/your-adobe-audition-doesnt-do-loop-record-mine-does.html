@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>blog of daniel sabsay</title>
+  <link rel="stylesheet" type="text/css" href="/theme/css/main.css" />
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1><a class="internal-link no-underline" href="/">blog of daniel sabsay</a></h1>
+      <nav>
+        <ul>
+              <li >
+                <a class='internal-link' href="/pages/about.html">About</a>
+              </li>
+            <li  class="active">
+              <a class='internal-link' href="/">Posts</a>
+            </li>
+          <li>
+            <hr class="footer-hr"/>
+          </li>
+        </ul>
+      </nav>
+    </header>
+    <div class="content">
+<h1 class="article-title">Your Adobe Audition doesn't do loop record? Mine does.</h1>
+<p class="article-date">Wed 11 March 2020 ▪︎  <a class="tag internal-link" href="/tag/filmmaking.html">filmmaking</a> <a class="tag internal-link" href="/tag/sound.html">sound</a> <a class="tag internal-link" href="/tag/hammerspoon.html">hammerspoon</a> <a class="tag internal-link" href="/tag/automation.html">automation</a></p>
+
+<div class="article-content">
+<h2>Background</h2>
+<p>I'm preparing to do <a href="https://en.wikipedia.org/wiki/Dubbing_(filmmaking)#ADR/post-sync">automated dialogue replacement (ADR)</a> for a short film I've been working on. The obvious first requirement for such a task is a quiet place to record. Because my dad was in a local band years ago, I now have access to a semi-soundproofed garage in a quiet country neighboorhood.</p>
+<p>But based on my experience with ADR from a <a href="https://www.youtube.com/watch?v=5-Q75YCy0BM">previous short film</a>, I know I also need to deaden the recording space as much as possible. In order to have the best chance at blending the studio-recorded dialogue with the aural space of the scene, I need dry sound: no reverb or echoes. The solution to this for my previous project was a last-minute, thrown-together, collection of mic stands, music stands, and chairs piled with blankets and pillows. I placed the microphone and actors in the middle of this makeshift fort to cut down on the reflections of the room. This time I wanted a better solution, so I built my own ADR sound booth:</p>
+<p><img alt="Image of my ADR sound booth" src="./images/IMG_1767.JPG"></p>
+<p>The frame is roughly 4ft x 4ft at the base, 7ft tall (I didn't want actors to feel cramped), and made from PVC pipe. Sound blankets are hung on all sides and gaps are held closed with a variety of clamps and clothespins. Materials for the frame cost less than $50. Sound blankets could also be replaced with some thick packing blankets (like those sold at Home Depot), if you're interested in building one of these for yourself.</p>
+<p>The actors have a monitor to watch the sequence and a pair of non-leaky headphones for reference audio. A second screen and additional headphones are used by myself and the director to manage and direct the session. The third screen (on my laptop) is only important for me, so I can drive Adobe Audition.</p>
+<p>The film's editor is using Adobe Premiere Pro, so using Audition makes it easy to integrate into his sequences. With Audition, I can do multitrack recording with effects, sync the session with a video clip, and display the video on multiple screens while recording. The recording count-in feature overlays a visual countdown on the screen to cue the actors.</p>
+<h2>Audition's missing feature</h2>
+<p>But Audition is still missing a crucial feature for ADR: loop recording. The "automated" part of "automated dialogue replacement" refers to the act of looping part of a scene, recording multiple takes as the actor attempts to re-perform their lines. Usually, many takes are required.</p>
+<p>So how do we do this with Audition?</p>
+<p>My initial solution was to use the (kinda) new <a href="https://helpx.adobe.com/audition/using/recording-audio.html#PunchandRoll">Punch and Roll record-mode</a>. After selecting a range in the timeline, starting the recording will rewind the playhead a few seconds before the selected in-point and start playback. When the playhead reaches the in-point, recording begins. Recording stops when the out-point of the selected time range is reached. Combining this with the <strong>Punch Again</strong> command allows me to—with a single keystroke—stop the current recording and start a new take at the same starting point.</p>
+<blockquote>
+<p>The Punch Again command can be assigned to a keyboard shortcut in the Keyboard Shortcuts dialog.</p>
+</blockquote>
+<p>A separate audio clip is created each time you begin a new recording. So, all the takes end up layered on the timeline, one on top of another. By assigning a new keyboard shortcut to the <strong>Send Clip to Back</strong> command, I can quickly cycle through each take for review.</p>
+<p>So, I can accomplish loop recording by repeatedly tapping my keyboard while the actors record take after take. It's far from automated this way, but it's a good-enough solution.</p>
+<p>Except that I can't test-drive my ADR setup on my own.</p>
+<p>I wanted to put my rig through its paces, test the acoustics of the booth, and try my hand at recording ADR (as an actor). I wanted to get more comfortable with the process from the actor's perspective so I could better manage the session.</p>
+<p>To do this, I replaced the dialogue from some famous movie scenes. But I didn't want to make someone babysit the <strong>Punch Again</strong> keyboard shortcut while I stammered and stumbled through line after line.</p>
+<p>I needed a way to automate this. I needed true <em>loop recording</em> (as it exists in music-focused DAWs).</p>
+<h2>Hammerspoon to the rescue</h2>
+<p>Then it hit me. I had the exact behavior I wanted from Audition, all triggered through keystrokes: <code>Shift+Space</code> to start the recording and <code>X</code> to <strong>Punch Again</strong>. From here, it was pretty easy to automate the keystrokes using <a href="http://www.hammerspoon.org/">Hammerspoon</a>.</p>
+<p>Hammerspoon is a desktop automation framework for macOS with an extensive Lua API that allows control over windows, applications, mouse/keyboard events, and much more. There is also a great selection of plugins called <strong>Spoons</strong> that give you plug-and-play features like <a href="http://www.hammerspoon.org/Spoons/WindowGrid.html">grid-based window management</a>, <a href="http://www.hammerspoon.org/Spoons/ClipboardTool.html">convienent clipboard history</a>, and more. I use the <a href="http://www.hammerspoon.org/Spoons/Seal.html">Seal</a> Spoon, which is self-advertised as a "pluggable launch bar". It's similar to the Spotlight search bar (accessible by default with <code>Cmd+Space</code>), but Seal is <em>customizable</em>. There are a few built-in commands in Seal, but the best part is you can define custom commands (called <strong>useractions</strong> in the documentation) to do anything you want, provided your "anything" is scriptable (via Hammerspoon, AppleScript, or some other program).</p>
+<p>So I wrote a quick Lua module with two functions: <code>startLoopRecord()</code> and <code>stopLoopRecord()</code>.</p>
+<p>When <code>startLoopRecord()</code> is called, it first verifies that Audition is the focused application; it displays and error and stops if this is not the case (to avoid injecting unwanted keystrokes into some other application). If Audition is focused, it injects a keystroke to start <strong>Punch and Roll</strong> recording. Then it sets an interval timer with a callback that is invoked every <code>preroll + dur</code> seconds. The callback function either stops loop recording (if Audition is no longer the focused application) or injects the <strong>Punch Again</strong> keyboard shortcut.</p>
+<p><code>stopLoopRecord()</code> simply stops the timer and the keyboard event stream.</p>
+<p>I imported this module into my <code>init.lua</code> script, and defined a custom <strong>Seal</strong> command that calls these functions:</p>
+<div class="highlight"><pre><span></span><span class="n">audition</span> <span class="o">=</span> <span class="nb">require</span><span class="p">(</span><span class="s2">&quot;audition&quot;</span><span class="p">)</span>
+
+<span class="c1">-- omitted</span>
+
+<span class="n">hs</span><span class="p">.</span><span class="n">loadSpoon</span><span class="p">(</span><span class="s2">&quot;Seal&quot;</span><span class="p">)</span>
+<span class="n">spoon</span><span class="p">.</span><span class="n">Seal</span><span class="p">:</span><span class="n">bindHotkeys</span><span class="p">({</span><span class="n">toggle</span> <span class="o">=</span> <span class="p">{</span><span class="n">hyper</span><span class="p">,</span> <span class="s2">&quot;space&quot;</span><span class="p">}})</span>
+<span class="n">spoon</span><span class="p">.</span><span class="n">Seal</span><span class="p">:</span><span class="n">loadPlugins</span><span class="p">({</span><span class="s2">&quot;useractions&quot;</span><span class="p">})</span>
+<span class="n">spoon</span><span class="p">.</span><span class="n">Seal</span><span class="p">.</span><span class="n">plugins</span><span class="p">.</span><span class="n">useractions</span><span class="p">.</span><span class="n">actions</span> <span class="o">=</span>
+    <span class="p">{</span>
+        <span class="p">[</span><span class="s2">&quot;Audition: Start loop record&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">keyword</span> <span class="o">=</span> <span class="s2">&quot;looprec&quot;</span><span class="p">,</span>
+            <span class="n">fn</span> <span class="o">=</span> <span class="kr">function</span><span class="p">(</span><span class="n">dur</span><span class="p">)</span> <span class="n">audition</span><span class="p">.</span><span class="n">startLoopRecord</span><span class="p">(</span><span class="n">dur</span><span class="p">)</span> <span class="kr">end</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="p">[</span><span class="s2">&quot;Audition: Stop loop record&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">keyword</span> <span class="o">=</span> <span class="s2">&quot;looprecstop&quot;</span><span class="p">,</span>
+            <span class="n">fn</span> <span class="o">=</span> <span class="kr">function</span><span class="p">()</span> <span class="n">audition</span><span class="p">.</span><span class="n">stopLoopRecord</span><span class="p">()</span> <span class="kr">end</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">}</span>
+<span class="n">spoon</span><span class="p">.</span><span class="n">Seal</span><span class="p">:</span><span class="n">start</span><span class="p">()</span>
+</pre></div>
+
+
+<p>The <strong>looprec</strong> command takes a duration as an argument, so it looks like this:</p>
+<p><img alt="Screenshot of Seal command" src="./images/seal_command.png"></p>
+<p>Running <code>looprec 10</code> will start loop recording for a 10-second loop.</p>
+<blockquote>
+<p>For best results, I usually set <code>dur</code> to be a second or two longer than I want because there is a slight delay between when the "Start Recording" keystroke is injected and when Audition actually starts the recording/pre-roll (pre-roll in this case).</p>
+</blockquote>
+<p>Here is <code>audition.lua</code>:</p>
+<div class="highlight"><pre><span></span><span class="c1">-- audition.lua</span>
+<span class="c1">-- Macros for Adobe Audition</span>
+
+<span class="kd">local</span> <span class="n">P</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="n">audition</span> <span class="o">=</span> <span class="n">P</span>
+
+<span class="c1">-- imports</span>
+<span class="kd">local</span> <span class="n">hs</span> <span class="o">=</span> <span class="n">hs</span>
+<span class="kd">local</span> <span class="nb">tonumber</span> <span class="o">=</span> <span class="nb">tonumber</span>
+
+<span class="c1">-- Create a new environment for the package:</span>
+<span class="kr">if</span> <span class="n">setfenv</span> <span class="kr">then</span>
+    <span class="n">setfenv</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">P</span><span class="p">)</span>
+<span class="kr">else</span>
+    <span class="n">_ENV</span> <span class="o">=</span> <span class="n">P</span>
+<span class="kr">end</span>
+
+<span class="n">timer</span> <span class="o">=</span> <span class="kc">nil</span>
+<span class="n">preroll</span> <span class="o">=</span> <span class="mi">3</span>  <span class="c1">-- set to the &quot;Pre-roll duration&quot; in &quot;Recording and Playback&quot; settings of Audition</span>
+<span class="n">stream</span> <span class="o">=</span> <span class="kc">nil</span>
+
+<span class="c1">-- dur: duration of loop</span>
+<span class="kr">function</span> <span class="nf">startLoopRecord</span><span class="p">(</span><span class="n">dur</span><span class="p">)</span>
+   <span class="n">dur</span> <span class="o">=</span> <span class="nb">tonumber</span><span class="p">(</span><span class="n">dur</span><span class="p">)</span>
+   <span class="kr">if</span> <span class="n">dur</span> <span class="o">==</span> <span class="kc">nil</span> <span class="kr">then</span>
+       <span class="n">hs</span><span class="p">.</span><span class="n">alert</span><span class="p">(</span><span class="s2">&quot;Must provide duration (seconds).&quot;</span><span class="p">)</span>
+       <span class="kr">return</span>
+   <span class="kr">end</span>
+   <span class="c1">-- Check if Audition is focused, cancel if not</span>
+   <span class="kd">local</span> <span class="n">app</span> <span class="o">=</span> <span class="n">hs</span><span class="p">.</span><span class="n">window</span><span class="p">.</span><span class="n">focusedWindow</span><span class="p">():</span><span class="n">application</span><span class="p">()</span>
+   <span class="kd">local</span> <span class="n">name</span> <span class="o">=</span> <span class="n">app</span><span class="p">:</span><span class="n">title</span><span class="p">()</span>
+   <span class="kr">if</span> <span class="n">name</span> <span class="o">~=</span> <span class="s2">&quot;Adobe Audition&quot;</span> <span class="kr">then</span>
+       <span class="n">hs</span><span class="p">.</span><span class="n">alert</span><span class="p">(</span><span class="s2">&quot;Audition must be focused.&quot;</span><span class="p">)</span>
+       <span class="kr">return</span>
+   <span class="kr">end</span>
+
+   <span class="n">hs</span><span class="p">.</span><span class="n">eventtap</span><span class="p">.</span><span class="n">keyStroke</span><span class="p">({</span><span class="s2">&quot;alt&quot;</span><span class="p">,</span> <span class="s2">&quot;shift&quot;</span><span class="p">},</span> <span class="s2">&quot;space&quot;</span><span class="p">)</span>
+   <span class="n">timer</span> <span class="o">=</span> <span class="n">hs</span><span class="p">.</span><span class="n">timer</span><span class="p">.</span><span class="n">doEvery</span><span class="p">(</span><span class="n">preroll</span> <span class="o">+</span> <span class="n">dur</span><span class="p">,</span> <span class="kr">function</span><span class="p">()</span>
+       <span class="kd">local</span> <span class="n">app</span> <span class="o">=</span> <span class="n">hs</span><span class="p">.</span><span class="n">window</span><span class="p">.</span><span class="n">focusedWindow</span><span class="p">():</span><span class="n">application</span><span class="p">()</span>
+       <span class="kd">local</span> <span class="n">name</span> <span class="o">=</span> <span class="n">app</span><span class="p">:</span><span class="n">title</span><span class="p">()</span>
+       <span class="kr">if</span> <span class="n">name</span> <span class="o">~=</span> <span class="s2">&quot;Adobe Audition&quot;</span> <span class="kr">then</span>
+          <span class="n">stopLoopRecord</span><span class="p">()</span>
+          <span class="kr">return</span>
+       <span class="kr">end</span>
+       <span class="n">hs</span><span class="p">.</span><span class="n">eventtap</span><span class="p">.</span><span class="n">keyStroke</span><span class="p">({},</span> <span class="s2">&quot;X&quot;</span><span class="p">)</span>
+    <span class="kr">end</span><span class="p">)</span>
+
+    <span class="c1">-- Stop loop record on &quot;space&quot;</span>
+    <span class="n">stream</span> <span class="o">=</span> <span class="n">hs</span><span class="p">.</span><span class="n">eventtap</span><span class="p">.</span><span class="n">new</span><span class="p">(</span>
+        <span class="p">{</span><span class="n">hs</span><span class="p">.</span><span class="n">eventtap</span><span class="p">.</span><span class="n">event</span><span class="p">.</span><span class="n">types</span><span class="p">[</span><span class="s2">&quot;keyDown&quot;</span><span class="p">]},</span>
+        <span class="kr">function</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+            <span class="kd">local</span> <span class="n">keycode</span> <span class="o">=</span> <span class="n">event</span><span class="p">:</span><span class="n">getKeyCode</span><span class="p">()</span>
+            <span class="kr">if</span> <span class="n">keycode</span> <span class="o">==</span> <span class="n">hs</span><span class="p">.</span><span class="n">keycodes</span><span class="p">.</span><span class="n">map</span><span class="p">[</span><span class="s2">&quot;space&quot;</span><span class="p">]</span> <span class="kr">then</span>
+                <span class="n">stopLoopRecord</span><span class="p">()</span>
+            <span class="kr">end</span>
+            <span class="kr">return</span> <span class="kc">false</span>
+        <span class="kr">end</span>
+    <span class="p">)</span>
+    <span class="n">stream</span><span class="p">:</span><span class="n">start</span><span class="p">()</span>
+<span class="kr">end</span>
+
+<span class="kr">function</span> <span class="nf">stopLoopRecord</span><span class="p">()</span>
+   <span class="kd">local</span> <span class="n">app</span> <span class="o">=</span> <span class="n">hs</span><span class="p">.</span><span class="n">window</span><span class="p">.</span><span class="n">focusedWindow</span><span class="p">():</span><span class="n">application</span><span class="p">()</span>
+   <span class="kd">local</span> <span class="n">name</span> <span class="o">=</span> <span class="n">app</span><span class="p">:</span><span class="n">title</span><span class="p">()</span>
+   <span class="kr">if</span> <span class="n">name</span> <span class="o">~=</span> <span class="s2">&quot;Adobe Audition&quot;</span> <span class="kr">then</span>
+       <span class="n">hs</span><span class="p">.</span><span class="n">alert</span><span class="p">(</span><span class="s2">&quot;Audition must be focused.&quot;</span><span class="p">)</span>
+       <span class="kr">return</span>
+   <span class="kr">end</span>
+   <span class="n">timer</span><span class="p">:</span><span class="n">stop</span><span class="p">()</span>
+   <span class="n">stream</span><span class="p">:</span><span class="n">stop</span><span class="p">()</span>
+   <span class="n">hs</span><span class="p">.</span><span class="n">alert</span><span class="p">(</span><span class="s2">&quot;Loop record stopped.&quot;</span><span class="p">)</span>
+<span class="kr">end</span>
+
+<span class="kr">return</span> <span class="n">P</span>
+</pre></div>
+
+
+<p>This worked like a charm. I set up an in-point and out-point, launched my <code>looprec</code> command and entered the ADR booth where I could focus solely on my performance.</p>
+</div>
+    </div>
+    <hr class="footer-hr"/>
+    <footer>
+      © 2020 Daniel Sabsay
+    </footer>
+  </div>
+</body>
