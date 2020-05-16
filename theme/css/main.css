@@ -85,6 +85,10 @@ header nav a:hover {
   color: gray;
 }
 
+header h1 {
+  margin-bottom: 0;
+}
+
 hr {
   border: 0;
   margin-top: 1rem;
@@ -180,6 +184,10 @@ h1.article-link a:hover {
 
 h4.article-link {
   margin-bottom: 0;
+}
+
+div.page-content {
+  font-family: 'Source Serif Pro', serif;
 }
 
 img {
