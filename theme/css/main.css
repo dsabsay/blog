@@ -215,7 +215,7 @@ a {
   color: black;
 }
 
-a:not(.internal-link):not(.footnote-ref):not(.footnote-backref):after {
+a:not(.internal-link):not(.footnote-ref):not(.footnote-backref):not(.img-link):after {
   font-size: .2rem;
   content: " ↗︎";
   /* border: 1px solid black; */
