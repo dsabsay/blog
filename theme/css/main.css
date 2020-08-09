@@ -194,6 +194,11 @@ img {
   display: block;
   margin: auto;
   max-width: 500px;
+  width: 100%;
+}
+
+div.highlight {
+  overflow: scroll;
 }
 
 code {
@@ -215,12 +220,20 @@ a {
   color: black;
 }
 
-a:not(.internal-link):not(.footnote-ref):not(.footnote-backref):not(.img-link):not(.headerlink):after {
+a:not(.internal-link):not(.footnote-ref):not(.footnote-backref):not(.img-link):not(.headerlink):not(.toclink):after {
   font-size: .2rem;
   content: " ↗︎";
   /* border: 1px solid black; */
   /* margin: .2rem; */
 }
+
+a.toclink {
+  text-decoration: none;
+}
+
+/* a.toclink:hover { */
+/*   text-decoration: underline; */
+/* } */
 
 a:hover {
   color: gray;
@@ -267,9 +280,6 @@ a.headerlink {
 h2:hover a {
   visibility: visible;
   opacity: 1;
-  color: inherit;
-}
-
-h2 a:hover {
   color: gray;
+  text-decoration: underline;
 }

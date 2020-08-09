@@ -177,7 +177,7 @@ cycles shuffling bits in and out of swap because there wasn't enough resident
 memory allocated to the VM to run all those heavy processes. On top of that,
 there wasn't much swap space to work with, so the system was essentially memory
 starved.&lt;/p&gt;
-&lt;h2 id="lessons-learned"&gt;Lessons Learned&lt;a class="headerlink" href="#lessons-learned" title="Permanent link"&gt;&amp;para;&lt;/a&gt;&lt;/h2&gt;
+&lt;h2 id="lessons-learned"&gt;&lt;a class="toclink" href="#lessons-learned"&gt;Lessons Learned&lt;/a&gt;&lt;a class="headerlink" href="#lessons-learned" title="Permanent link"&gt;&amp;para;&lt;/a&gt;&lt;/h2&gt;
 &lt;p&gt;After every serious debugging session, I like to reflect on the experience and
 identify helpful and harmful behaviors. If I do this enough, hopefully I'll get
 better at debugging. Here are a few thoughts:&lt;/p&gt;
@@ -217,7 +217,7 @@ better at debugging. Here are a few thoughts:&lt;/p&gt;
     imagine the more experience you have with a particular system, the less
     this may be necessary.&lt;/li&gt;
 &lt;/ul&gt;
-&lt;h2 id="addendum"&gt;Addendum: Don't guess what metrics mean&lt;a class="headerlink" href="#addendum" title="Permanent link"&gt;&amp;para;&lt;/a&gt;&lt;/h2&gt;
+&lt;h2 id="addendum"&gt;&lt;a class="toclink" href="#addendum"&gt;Addendum: Don't guess what metrics mean&lt;/a&gt;&lt;a class="headerlink" href="#addendum" title="Permanent link"&gt;&amp;para;&lt;/a&gt;&lt;/h2&gt;
 &lt;p&gt;I related a couple times how I concluded the output from &lt;code&gt;iostat&lt;/code&gt; (IO
 statistics) was "not unusual". I now question that conclusion.&lt;/p&gt;
 &lt;p&gt;As I used it in
@@ -423,14 +423,14 @@ alone. Here are some loosely related ideas that I found interesting:&lt;/p&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
 &lt;/ul&gt;
-&lt;h2 id="style-1"&gt;Style &lt;sup id="fnref:1"&gt;&lt;a class="footnote-ref" href="#fn:1"&gt;1&lt;/a&gt;&lt;/sup&gt;&lt;a class="headerlink" href="#style-1" title="Permanent link"&gt;&amp;para;&lt;/a&gt;&lt;/h2&gt;
+&lt;h2 id="style-1"&gt;&lt;a class="toclink" href="#style-1"&gt;Style &lt;sup id="fnref:1"&gt;&lt;a class="footnote-ref" href="#fn:1"&gt;1&lt;/a&gt;&lt;/sup&gt;&lt;/a&gt;&lt;a class="headerlink" href="#style-1" title="Permanent link"&gt;&amp;para;&lt;/a&gt;&lt;/h2&gt;
 &lt;p&gt;The narrative tends to jump around quite often (from sport to sport and athlete
 to athlete), requiring context switches that were jarring at times.&lt;/p&gt;
 &lt;p&gt;Aside from this, the writing is approachable. Reads more like a long news
 article than an essay. Lots of hypophoras. I just didn't love the writing style
 for some reason, though. It wasn't &lt;em&gt;bad&lt;/em&gt;. Just wasn't particularly attractive to
 me.&lt;/p&gt;
-&lt;h2 id="things-from-this-book-i-applied-to-my-own-life"&gt;Things from this book I applied to my own life&lt;a class="headerlink" href="#things-from-this-book-i-applied-to-my-own-life" title="Permanent link"&gt;&amp;para;&lt;/a&gt;&lt;/h2&gt;
+&lt;h2 id="things-from-this-book-i-applied-to-my-own-life"&gt;&lt;a class="toclink" href="#things-from-this-book-i-applied-to-my-own-life"&gt;Things from this book I applied to my own life&lt;/a&gt;&lt;a class="headerlink" href="#things-from-this-book-i-applied-to-my-own-life" title="Permanent link"&gt;&amp;para;&lt;/a&gt;&lt;/h2&gt;
 &lt;p&gt;If you're not throwing yourself off skyscrapers for "sport", it's harder to get
 into flow. But this book gave me a few ideas I was able to apply to my life and
 work to positive effect.&lt;/p&gt;
