@@ -31,6 +31,19 @@
 <p class="article-date">Sun 14 June 2020 ▪︎  <a class="tag internal-link" href="https://dsabsay.github.io/blog/tag/debugging.html">debugging</a> <a class="tag internal-link" href="https://dsabsay.github.io/blog/tag/docker.html">docker</a> <a class="tag internal-link" href="https://dsabsay.github.io/blog/tag/linux.html">linux</a></p>
 
 <div class="article-content">
+<div class="admonition note">
+<p class="admonition-title">TL;DR</p>
+<p>If you're running Docker for Mac and experiencing massive CPU spikes 
+and slow response to Docker commands, ensure you've allocated enough 
+memory and swap space to Docker. You can use the command below to 
+inspect the Linux virtual machine that Docker is running in.<sup id="fnref:0"><a class="footnote-ref" href="#fn:0">1</a></sup></p>
+<p><code>docker run -it --rm --pid host alpine /bin/sh</code></p>
+<p>Then run <code>top</code> for CPU/mem usage and <code>iostat -m</code> for IO stats.</p>
+<p>In my case, the CPU spikes were caused by memory starvation; the 
+<a href="https://askubuntu.com/questions/259739/kswapd0-is-taking-a-lot-of-cpu/530661#530661">kswapd0</a> 
+process was running hot, indicating likely 
+<a href="https://en.wikipedia.org/wiki/Thrashing_(computer_science)">thrashing</a>.</p>
+</div>
 <p>I've been working on packaging software for several different Linux
 distributions. Docker containers provide a great environment to build and test
 such packages. A little work is required to set up the containers to properly
@@ -41,18 +54,25 @@ Docker Compose gives further flexibility and ease of use. Until, of course, your
 tests begin failing intermittently and Docker itself comes to a
 screeching halt, grinding away for many seconds at simple <code>docker-compose ps</code>
 commands.</p>
-<p>Such was my dilemna.</p>
+<p>Such was my dilemma.</p>
 <p>To be more exact, my Docker Compose environment worked fine for about a minute
 after starting. I could run the tests on the package (against all containers)
 successfully one or two times. But then things would go south. The tests started
 failing. The Docker daemon took <em>ages</em> to respond to simple commands. Meanwhile,
 my laptop fans kicked into high gear and I noticed something peculiar:</p>
-<p><a class="img-link" href="https://dsabsay.github.io/blog/images/activity_monitor.png"><img alt="Activity Monitor shows 669% CPU utilization for com.docker.hyperkit" src="https://dsabsay.github.io/blog/images/activity_monitor.png"></a></p>
+<figure>
+    <a class="img-link" href="https://dsabsay.github.io/blog/images/activity_monitor.png">
+        <img src="https://dsabsay.github.io/blog/images/activity_monitor.png" alt="Activity Monitor 
+        shows 669% CPU utilization for com.docker.hyperkit">
+    </a>
+    <figcaption>Activity Monitor shows 669% CPU utilization for com.docker.hyperkit</figcaption>
+</figure>
+
 <p>This behavior was consistent. I tore down the containers and started them up.
 Same problem. I restarted the Docker daemon. Same problem: things worked briefly
 and then broke.</p>
 <p>I jumped on Google and started searching with the only searchable symptom I
-had: massize CPU usage. Almost immediately, I found <a href="https://github.com/docker/for-mac/issues/3499">com.docker.hyperkit 100%
+had: massive CPU usage. Almost immediately, I found <a href="https://github.com/docker/for-mac/issues/3499">com.docker.hyperkit 100%
 cpu usage is back again</a>, an
 extremely popular GitHub issue on the Docker for Mac repository. The bug is
 <em>still</em> not fully understood, but the symptoms and mitigations proposed seemed
@@ -61,7 +81,7 @@ containers at all, Docker CPU usage spikes (multiple times per day) and Docker
 commands lock up. I only noticed my problem <em>while running containers</em>, but
 that's a detail I (mistakenly) didn't give enough consideration to.</p>
 <p>The current hypothesis for the bug's cause involves filesystem
-synchronization between macOS and the Docker VM <sup id="fnref:1"><a class="footnote-ref" href="#fn:1">1</a></sup>:</p>
+synchronization between macOS and the Docker VM <sup id="fnref:1"><a class="footnote-ref" href="#fn:1">2</a></sup>:</p>
 <blockquote>
 <p>Things that can cause the infinite loop seem to involve syncing of file system
 events between OS-X and the docker VM. The fewer file system shares you have,
@@ -70,9 +90,10 @@ mounts to :cached then that means there will be fewer notifications being sent
 back and forth between the Docker VM and OS-X, just less chance of the issue.</p>
 <p><a href="https://github.com/docker/for-mac/issues/3499#issue-405295845">source (github.com)</a></p>
 </blockquote>
-<p>I knew that my Compose environment was utilizing bind mounts with potentiallly
-high read/write frequency <sup id="fnref:2"><a class="footnote-ref" href="#fn:2">2</a></sup>, so it seemed plausible that this bug report and <em>my</em>
-issue sprouted from the same core problem. Even if they didn't, the mitigations
+<p>I knew my Compose environment was utilizing bind mounts with potentially
+high read/write frequency <sup id="fnref:2"><a class="footnote-ref" href="#fn:2">3</a></sup>, so it seemed plausible that this bug report and 
+<em>my</em> issue sprouted from the same core problem. Even if they didn't, the 
+mitigations
 proposed in the bug report gave me some easy ideas to try.</p>
 <p>As suggested in the GitHub Issue, I removed a couple unnecessary file sharing
 mounts from my Docker settings. No change.</p>
@@ -110,8 +131,8 @@ a PID 1 despite the fact there is already a PID 1 on the underlying system). Tur
 out it's pretty easy to break out of this isolation if you want to. By
 specifying the <code>host</code> option, the container is given access to the host's PID
 namespace:</p>
-<div class="highlight"><pre><span></span>docker run -it --rm --pid host &lt;image name&gt; &lt;command&gt;
-</pre></div>
+<div class="highlight"><pre><span></span><code>docker run -it --rm --pid host &lt;image name&gt; &lt;command&gt;
+</code></pre></div>
 
 
 <p>See <a href="https://docs.docker.com/engine/reference/run/#pid-settings---pid">the Docker
@@ -123,33 +144,38 @@ Remember, with Docker for Mac we're running containers <em>inside</em> a Linux V
 which is in turn running on macOS.</p>
 </blockquote>
 <p>Equipped with this new debugging ability, I can now look at what's happening in
-the Linux VM. I look at IO stats:</p>
+the Linux VM. I start a shell with this command:</p>
+<div class="highlight"><pre><span></span><code>docker run -it --rm --pid host alpine /bin/sh
+</code></pre></div>
+
+
+<p>and start looking around. I look at IO stats:</p>
 <p><a class="img-link" href="https://dsabsay.github.io/blog/images/iostats_1.png"><img alt="IO stats in Docker VM shows 890MB_read/s on a couple devices" src="https://dsabsay.github.io/blog/images/iostats_1.png"></a></p>
-<p>Wow! 890MB of reads per second?! Seems kinda crazy. But I don't actually know at
-this point, as I don't know what "normal" looks like.</p>
+<p>Wow! 890MB of reads per second?! Seems kinda crazy. But I don't know if it's 
+unusual, as I don't know what "normal" looks like.</p>
 <p>I look at <code>top</code> output:</p>
 <p><a class="img-link" href="https://dsabsay.github.io/blog/images/top_1.png"><img alt="top output of Docker VM while running problematic containers" src="https://dsabsay.github.io/blog/images/top_1.png"></a></p>
-<p>I don't see anything too alarming, although the 92% usr CPU usage is pretty dang
+<p>I don't see anything too alarming, although the 92% user CPU usage is pretty dang
 high. But I already knew that was happening. I don't see any obvious rogue
 processes.</p>
 <p>This was good visibility, but I needed a baseline comparison before I could
 decide whether any of this was out of line. So I stopped all my
-"problem" containers, started up a single mongodb container, and looked at the
+"problem" containers, started up a single MongoDB container, and looked at the
 same system stats.</p>
 <p>First, the IO stats:</p>
 <p><a class="img-link" href="https://dsabsay.github.io/blog/images/iostats_2.png"><img alt="IO stats in Docker VM shows roughly equivalent disk usage while running a
 single container" src="https://dsabsay.github.io/blog/images/iostats_2.png"></a></p>
 <p>862MB of reads per second on two devices. Roughly the same as it was before. So
-I guess <em>that's</em> not as unusual as I thought <sup id="fnref:3"><a class="footnote-ref" href="#fn:3">3</a></sup>.</p>
+I guess <em>that's</em> not as unusual as I thought <sup id="fnref:3"><a class="footnote-ref" href="#fn:3">4</a></sup>.</p>
 <p>The <code>top</code> output, however, was quite different:</p>
 <p><a class="img-link" href="https://dsabsay.github.io/blog/images/top_2.png"><img alt="top output while running single container is quite different" src="https://dsabsay.github.io/blog/images/top_2.png"></a></p>
 <p><code>usr</code> CPU % is at 0, as are all processes on the system.</p>
 <p>After seeing what these stats look like under working, normal conditions, I
 decide to look more closely at the top output from before. The process taking up
 the most CPU time is <code>[kswapd0]</code>. It was holding at a steady 16% CPU
-utilization <sup id="fnref:4"><a class="footnote-ref" href="#fn:4">4</a></sup>.</p>
-<p>I wasn't actually sure what this process does. It took ~30 seconds to find out
-what I needed to know:</p>
+utilization <sup id="fnref:4"><a class="footnote-ref" href="#fn:4">5</a></sup>.</p>
+<p>I wasn't sure what this process does. It took ~30 seconds to find what I needed 
+to know:</p>
 <blockquote>
 <p>The process kswapd0 is the process that manages virtual memory.</p>
 <p><a href="https://askubuntu.com/a/530661">source (askubuntu.com)</a></p>
@@ -158,10 +184,10 @@ what I needed to know:</p>
 <p>I look again at the <code>top</code> output recorded in my notes, and realize something
 glaring I had overlooked before. Because <code>top</code> by default prints memory stats in
 kilobytes, and my mushy brain doesn't really process numbers with that many
-digits, I hadn't payed much attention to the memory usage stats <sup id="fnref:5"><a class="footnote-ref" href="#fn:5">5</a></sup>.</p>
+digits, I hadn't payed much attention to the memory usage stats <sup id="fnref:5"><a class="footnote-ref" href="#fn:5">6</a></sup>.</p>
 <p>Some quick calculations showed that out of 2GB available memory in the Docker
 VM, only 2% was free! Further, the <code>VSZ</code> column showed that several processes
-were using a large amount of memory <sup id="fnref:6"><a class="footnote-ref" href="#fn:6">6</a></sup>.</p>
+were using a large amount of memory <sup id="fnref:6"><a class="footnote-ref" href="#fn:6">7</a></sup>.</p>
 <p>I check my Docker settings, and find that I only have 2GB of memory (RAM)
 allocated to Docker and only 1GB of swap:</p>
 <p><a class="img-link" href="https://dsabsay.github.io/blog/images/docker_resources.png"><img alt="My Docker resources
@@ -179,10 +205,10 @@ cycles shuffling bits in and out of swap because there wasn't enough resident
 memory allocated to the VM to run all those heavy processes. On top of that,
 there wasn't much swap space to work with, so the system was essentially memory
 starved.</p>
-<h2>Lessons Learned</h2>
+<h2 id="lessons-learned">Lessons Learned<a class="headerlink" href="#lessons-learned" title="Permanent link">&para;</a></h2>
 <p>After every serious debugging session, I like to reflect on the experience and
 identify helpful and harmful behaviors. If I do this enough, hopefully I'll get
-better at debugging. Here's a few thoughts:</p>
+better at debugging. Here are a few thoughts:</p>
 <ul>
 <li><strong>Any process that has constant and fairly high CPU usage is suspicious.</strong> There
     <em>could</em> be situations where you would expect to see this, but in my case
@@ -191,9 +217,10 @@ better at debugging. Here's a few thoughts:</p>
 <li><strong>When looking at bug reports and their associated root causes, prioritize
     <em>eliminating</em> it as a
     possible cause as quickly as possible.</strong> Led by my initial search results
-    concerning bind-mount performance, I spent a good deal of time determining
-    if it was relevant. By removing bind-mounts from the equation entirely, I could
-    conclude that it was <em>not</em> the problem, and could move on to other
+    concerning bind-mount performance, I spent a good deal of time reading about 
+    different bind-mount options and development history. Eventually, I removed 
+    bind-mounts from the equation entirely, and
+    concluded it was <em>not</em> the problem, and could move on to other
     possibilities. I wish I had done this sooner; I wish I hadn't spent so much time
     dwelling on this possible cause. It was not all for naught, though. I did
     learn some things about Docker (for Mac) by pursuing that thread.</li>
@@ -201,11 +228,11 @@ better at debugging. Here's a few thoughts:</p>
     analysis.</strong> This is a more general statement of the previous lesson. I ran
     for longer than I should have with the idea that a bind-mount problem was
     the culprit (as discussed directly above). Validating (or invalidating)
-    assumptions is necessary for forward progress. Sticking with unvalidated
+    assumptions is necessary for forward progress. Sticking with unproven
     assumptions for too long is harmful.</li>
 <li><strong>Ensure your debugging tools present information in a way that is <em>easy</em> for
-    you to read and interpret.</strong> Evidently, if I
-    do not heed this, I ignore important data.
+    you to read and interpret.</strong> Evidently, when I
+    do not heed this advice, I ignore important data.
     I skipped over the <em>glaringly obvious</em> memory usage problem
     presented by <code>top</code> the first time I looked at it. Why? Because the data was
     presented in kilobytes, I couldn't make sense of it easily, and moved on. But
@@ -218,19 +245,19 @@ better at debugging. Here's a few thoughts:</p>
     imagine the more experience you have with a particular system, the less
     this may be necessary.</li>
 </ul>
-<h2 id="addendum">Addendum: Don't guess what metrics mean</h2>
+<h2 id="addendum">Addendum: Don't guess what metrics mean<a class="headerlink" href="#addendum" title="Permanent link">&para;</a></h2>
 <p>I related a couple times how I concluded the output from <code>iostat</code> (IO
 statistics) was "not unusual". I now question that conclusion.</p>
 <p>As I used it in
-this debugging adventure, <code>iostat</code> was reporing based on the entire history of
+this debugging adventure, <code>iostat</code> was reporting based on the entire history of
 the VM since boot. So the <code>890MB_read/s</code> is an average across quite a lot of
 time. I did not restart Docker before getting my baseline reading of this
-metric (with the single mongodb container), and thus might have decieved myself.
+metric (with the single MongoDB container), and thus might have deceived myself.
 In other words, the <code>890MB_read/s</code> may actually <em>be</em> high compared to
 normal Docker usage. However, since my "baseline" reading was essentially an average which <em>included</em>
 the time the "problem" containers were running in the Docker VM, it probably was
 <em>not</em> a proper baseline. A proper baseline would have been an average reading
-from a fresh reboot of the VM, followed by running the single mongodb container.
+from a fresh reboot of the VM, followed by running the single MongoDB container.
 The fact that the <em>supposed</em> baseline reading was a bit lower than the first
 reading (<code>860MB_read/s</code> vs. <code>890MB_read/s</code>) supports this. I don't care to recreate
 everything as before to verify; I'm reasonably confident that I am correct
@@ -245,34 +272,37 @@ the MB_read/s was calculated, I created a useless comparison.</p>
 <div class="footnote">
 <hr>
 <ol>
+<li id="fn:0">
+<p>See footnote 2.&#160;<a class="footnote-backref" href="#fnref:0" title="Jump back to footnote 1 in the text">&#8617;</a></p>
+</li>
 <li id="fn:1">
 <p>When you run Docker on your Mac, you're actually
 running a full Linux virtual machine. Since containers are essentially extensions of
 Linux kernel features, the way you run containers on macOS is by first running a
 Linux VM and then running your containers <em>in the VM</em>. So, Docker for Mac can be
 seen as sort of a glue layer between macOS and the pure Linux Docker
-implementation. Now you know.&#160;<a class="footnote-backref" href="#fnref:1" title="Jump back to footnote 1 in the text">&#8617;</a></p>
+implementation. Now you know.&#160;<a class="footnote-backref" href="#fnref:1" title="Jump back to footnote 2 in the text">&#8617;</a></p>
 </li>
 <li id="fn:2">
 <p>One of the containers was running <a href="https://prometheus.io/">Prometheus</a>, a metrics-based monitoring tool
-that stores timeseries data on disk. The directory Prometheus was writing all
-its data to was bind-mounted to the macOS (host) filesystem.&#160;<a class="footnote-backref" href="#fnref:2" title="Jump back to footnote 2 in the text">&#8617;</a></p>
+that stores time series data on disk. The directory Prometheus was writing all
+its data to was bind-mounted to the macOS (host) filesystem.&#160;<a class="footnote-backref" href="#fnref:2" title="Jump back to footnote 3 in the text">&#8617;</a></p>
 </li>
 <li id="fn:3">
-<p>Actually, it probably <em>was</em> abnormal. See <a class="internal-link" href="#addendum">Addendum</a>.&#160;<a class="footnote-backref" href="#fnref:3" title="Jump back to footnote 3 in the text">&#8617;</a></p>
+<p>Actually, it probably <em>was</em> abnormal. See <a class="internal-link" href="#addendum">Addendum</a>.&#160;<a class="footnote-backref" href="#fnref:3" title="Jump back to footnote 4 in the text">&#8617;</a></p>
 </li>
 <li id="fn:4">
 <p>That in itself should have been enough to set my hairs up. I rarely see <em>any</em>
-process consume such a consistent amount of time on the CPU.&#160;<a class="footnote-backref" href="#fnref:4" title="Jump back to footnote 4 in the text">&#8617;</a></p>
+process consume such a consistent amount of time on the CPU.&#160;<a class="footnote-backref" href="#fnref:4" title="Jump back to footnote 5 in the text">&#8617;</a></p>
 </li>
 <li id="fn:5">
 <p>You can of course shift to more readable units by supplying <code>-M</code> on the
-commandline, or typing <code>E</code> while in <code>top</code>. If that doesn't work, consult the man
-page for your particular version of <code>top</code>.&#160;<a class="footnote-backref" href="#fnref:5" title="Jump back to footnote 5 in the text">&#8617;</a></p>
+command line, or typing <code>E</code> while in <code>top</code>. If that doesn't work, consult the man
+page for your particular version of <code>top</code>.&#160;<a class="footnote-backref" href="#fnref:5" title="Jump back to footnote 6 in the text">&#8617;</a></p>
 </li>
 <li id="fn:6">
 <p>The <code>VSZ</code> column shows all memory accessible by the process, including shared
-libraries and memory in swap space. See <a href="https://stackoverflow.com/a/21049737">https://stackoverflow.com/a/21049737</a>&#160;<a class="footnote-backref" href="#fnref:6" title="Jump back to footnote 6 in the text">&#8617;</a></p>
+libraries and memory in swap space. See <a href="https://stackoverflow.com/a/21049737">https://stackoverflow.com/a/21049737</a>&#160;<a class="footnote-backref" href="#fnref:6" title="Jump back to footnote 7 in the text">&#8617;</a></p>
 </li>
 </ol>
 </div>

@@ -215,7 +215,7 @@ a {
   color: black;
 }
 
-a:not(.internal-link):not(.footnote-ref):not(.footnote-backref):not(.img-link):after {
+a:not(.internal-link):not(.footnote-ref):not(.footnote-backref):not(.img-link):not(.headerlink):after {
   font-size: .2rem;
   content: " ↗︎";
   /* border: 1px solid black; */
@@ -228,4 +228,48 @@ a:hover {
 
 a.no-underline {
   text-decoration: none;
+}
+
+figcaption {
+  font-style: italic;
+  text-align: center;
+  padding-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.admonition {
+  padding: 1rem;
+  background-color: #ece9e1;
+  border: 1px solid #b5b5b5;
+}
+
+.admonition p:first-child {
+  padding: 0;
+  margin: 0;
+}
+
+.admonition p:last-child {
+  padding: 0;
+  margin: 0;
+}
+.admonition-title {
+  font-weight: 800;
+}
+
+a.headerlink {
+  visibility: hidden;
+  opacity: 0;
+  transition: visibility 0s,opacity .2s ease-in;
+  margin-left: 1rem;
+  text-align: left;
+}
+
+h2:hover a {
+  visibility: visible;
+  opacity: 1;
+  color: inherit;
+}
+
+h2 a:hover {
+  color: gray;
 }
