@@ -135,7 +135,8 @@ p.article-date {
 
 div.article-content {
   font-family: 'Source Serif Pro', serif;
-  font-size: .9rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
 }
 
 div.article-content li:not(:last-child) {
@@ -221,8 +222,8 @@ a {
 }
 
 a:not(.internal-link):not(.footnote-ref):not(.footnote-backref):not(.img-link):not(.headerlink):not(.toclink):after {
-  font-size: .2rem;
-  content: " ↗︎";
+  font-size: .9rem;
+  content: " ➚";
   /* border: 1px solid black; */
   /* margin: .2rem; */
 }
