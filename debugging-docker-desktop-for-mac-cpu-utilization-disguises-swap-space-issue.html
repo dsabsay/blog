@@ -17,6 +17,9 @@
               <li >
                 <a class='internal-link' href="https://dsabsay.github.io/blog/pages/about.html">About</a>
               </li>
+              <li >
+                <a class='internal-link' href="https://dsabsay.github.io/blog/pages/music-tools.html">Music Tools</a>
+              </li>
             <li  class="active">
               <a class='internal-link' href="https://dsabsay.github.io/blog/">Posts</a>
             </li>
@@ -36,7 +39,7 @@
 <p>If you're running Docker for Mac and experiencing massive CPU spikes 
 and slow response to Docker commands, ensure you've allocated enough 
 memory and swap space to Docker. You can use the command below to 
-inspect the Linux virtual machine that Docker is running in.<sup id="fnref:0"><a class="footnote-ref" href="#fn:0">1</a></sup></p>
+inspect the Linux virtual machine that Docker is running in.<sup id="fnref:0"><a class="footnote-ref" href="#fn:0">7</a></sup></p>
 <p><code>docker run -it --rm --pid host alpine /bin/sh</code></p>
 <p>Then run <code>top</code> for CPU/mem usage and <code>iostat -m</code> for IO stats.</p>
 <p>In my case, the CPU spikes were caused by memory starvation; the 
@@ -81,7 +84,7 @@ containers at all, Docker CPU usage spikes (multiple times per day) and Docker
 commands lock up. I only noticed my problem <em>while running containers</em>, but
 that's a detail I (mistakenly) didn't give enough consideration to.</p>
 <p>The current hypothesis for the bug's cause involves filesystem
-synchronization between macOS and the Docker VM <sup id="fnref:1"><a class="footnote-ref" href="#fn:1">2</a></sup>:</p>
+synchronization between macOS and the Docker VM <sup id="fnref:1"><a class="footnote-ref" href="#fn:1">1</a></sup>:</p>
 <blockquote>
 <p>Things that can cause the infinite loop seem to involve syncing of file system
 events between OS-X and the docker VM. The fewer file system shares you have,
@@ -91,7 +94,7 @@ back and forth between the Docker VM and OS-X, just less chance of the issue.</p
 <p><a href="https://github.com/docker/for-mac/issues/3499#issue-405295845">source (github.com)</a></p>
 </blockquote>
 <p>I knew my Compose environment was utilizing bind mounts with potentially
-high read/write frequency <sup id="fnref:2"><a class="footnote-ref" href="#fn:2">3</a></sup>, so it seemed plausible that this bug report and 
+high read/write frequency <sup id="fnref:2"><a class="footnote-ref" href="#fn:2">2</a></sup>, so it seemed plausible that this bug report and 
 <em>my</em> issue sprouted from the same core problem. Even if they didn't, the 
 mitigations
 proposed in the bug report gave me some easy ideas to try.</p>
@@ -131,9 +134,8 @@ a PID 1 despite the fact there is already a PID 1 on the underlying system). Tur
 out it's pretty easy to break out of this isolation if you want to. By
 specifying the <code>host</code> option, the container is given access to the host's PID
 namespace:</p>
-<div class="highlight"><pre><span></span><code>docker run -it --rm --pid host &lt;image name&gt; &lt;command&gt;
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>-it<span class="w"> </span>--rm<span class="w"> </span>--pid<span class="w"> </span>host<span class="w"> </span>&lt;image<span class="w"> </span>name&gt;<span class="w"> </span>&lt;command&gt;
 </code></pre></div>
-
 
 <p>See <a href="https://docs.docker.com/engine/reference/run/#pid-settings---pid">the Docker
 docs</a> on the
@@ -145,9 +147,8 @@ which is in turn running on macOS.</p>
 </blockquote>
 <p>Equipped with this new debugging ability, I can now look at what's happening in
 the Linux VM. I start a shell with this command:</p>
-<div class="highlight"><pre><span></span><code>docker run -it --rm --pid host alpine /bin/sh
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>-it<span class="w"> </span>--rm<span class="w"> </span>--pid<span class="w"> </span>host<span class="w"> </span>alpine<span class="w"> </span>/bin/sh
 </code></pre></div>
-
 
 <p>and start looking around. I look at IO stats:</p>
 <p><a class="img-link" href="https://dsabsay.github.io/blog/images/iostats_1.png"><img alt="IO stats in Docker VM shows 890MB_read/s on a couple devices" src="https://dsabsay.github.io/blog/images/iostats_1.png"></a></p>
@@ -166,14 +167,14 @@ same system stats.</p>
 <p><a class="img-link" href="https://dsabsay.github.io/blog/images/iostats_2.png"><img alt="IO stats in Docker VM shows roughly equivalent disk usage while running a
 single container" src="https://dsabsay.github.io/blog/images/iostats_2.png"></a></p>
 <p>862MB of reads per second on two devices. Roughly the same as it was before. So
-I guess <em>that's</em> not as unusual as I thought <sup id="fnref:3"><a class="footnote-ref" href="#fn:3">4</a></sup>.</p>
+I guess <em>that's</em> not as unusual as I thought <sup id="fnref:3"><a class="footnote-ref" href="#fn:3">3</a></sup>.</p>
 <p>The <code>top</code> output, however, was quite different:</p>
 <p><a class="img-link" href="https://dsabsay.github.io/blog/images/top_2.png"><img alt="top output while running single container is quite different" src="https://dsabsay.github.io/blog/images/top_2.png"></a></p>
 <p><code>usr</code> CPU % is at 0, as are all processes on the system.</p>
 <p>After seeing what these stats look like under working, normal conditions, I
 decide to look more closely at the top output from before. The process taking up
 the most CPU time is <code>[kswapd0]</code>. It was holding at a steady 16% CPU
-utilization <sup id="fnref:4"><a class="footnote-ref" href="#fn:4">5</a></sup>.</p>
+utilization <sup id="fnref:4"><a class="footnote-ref" href="#fn:4">4</a></sup>.</p>
 <p>I wasn't sure what this process does. It took ~30 seconds to find what I needed 
 to know:</p>
 <blockquote>
@@ -184,10 +185,10 @@ to know:</p>
 <p>I look again at the <code>top</code> output recorded in my notes, and realize something
 glaring I had overlooked before. Because <code>top</code> by default prints memory stats in
 kilobytes, and my mushy brain doesn't really process numbers with that many
-digits, I hadn't payed much attention to the memory usage stats <sup id="fnref:5"><a class="footnote-ref" href="#fn:5">6</a></sup>.</p>
+digits, I hadn't payed much attention to the memory usage stats <sup id="fnref:5"><a class="footnote-ref" href="#fn:5">5</a></sup>.</p>
 <p>Some quick calculations showed that out of 2GB available memory in the Docker
 VM, only 2% was free! Further, the <code>VSZ</code> column showed that several processes
-were using a large amount of memory <sup id="fnref:6"><a class="footnote-ref" href="#fn:6">7</a></sup>.</p>
+were using a large amount of memory <sup id="fnref:6"><a class="footnote-ref" href="#fn:6">6</a></sup>.</p>
 <p>I check my Docker settings, and find that I only have 2GB of memory (RAM)
 allocated to Docker and only 1GB of swap:</p>
 <p><a class="img-link" href="https://dsabsay.github.io/blog/images/docker_resources.png"><img alt="My Docker resources
@@ -272,37 +273,37 @@ the MB_read/s was calculated, I created a useless comparison.</p>
 <div class="footnote">
 <hr>
 <ol>
-<li id="fn:0">
-<p>See footnote 2.&#160;<a class="footnote-backref" href="#fnref:0" title="Jump back to footnote 1 in the text">&#8617;</a></p>
-</li>
 <li id="fn:1">
 <p>When you run Docker on your Mac, you're actually
 running a full Linux virtual machine. Since containers are essentially extensions of
 Linux kernel features, the way you run containers on macOS is by first running a
 Linux VM and then running your containers <em>in the VM</em>. So, Docker for Mac can be
 seen as sort of a glue layer between macOS and the pure Linux Docker
-implementation. Now you know.&#160;<a class="footnote-backref" href="#fnref:1" title="Jump back to footnote 2 in the text">&#8617;</a></p>
+implementation. Now you know.&#160;<a class="footnote-backref" href="#fnref:1" title="Jump back to footnote 1 in the text">&#8617;</a></p>
 </li>
 <li id="fn:2">
 <p>One of the containers was running <a href="https://prometheus.io/">Prometheus</a>, a metrics-based monitoring tool
 that stores time series data on disk. The directory Prometheus was writing all
-its data to was bind-mounted to the macOS (host) filesystem.&#160;<a class="footnote-backref" href="#fnref:2" title="Jump back to footnote 3 in the text">&#8617;</a></p>
+its data to was bind-mounted to the macOS (host) filesystem.&#160;<a class="footnote-backref" href="#fnref:2" title="Jump back to footnote 2 in the text">&#8617;</a></p>
 </li>
 <li id="fn:3">
-<p>Actually, it probably <em>was</em> abnormal. See <a class="internal-link" href="#addendum">Addendum</a>.&#160;<a class="footnote-backref" href="#fnref:3" title="Jump back to footnote 4 in the text">&#8617;</a></p>
+<p>Actually, it probably <em>was</em> abnormal. See <a class="internal-link" href="#addendum">Addendum</a>.&#160;<a class="footnote-backref" href="#fnref:3" title="Jump back to footnote 3 in the text">&#8617;</a></p>
 </li>
 <li id="fn:4">
 <p>That in itself should have been enough to set my hairs up. I rarely see <em>any</em>
-process consume such a consistent amount of time on the CPU.&#160;<a class="footnote-backref" href="#fnref:4" title="Jump back to footnote 5 in the text">&#8617;</a></p>
+process consume such a consistent amount of time on the CPU.&#160;<a class="footnote-backref" href="#fnref:4" title="Jump back to footnote 4 in the text">&#8617;</a></p>
 </li>
 <li id="fn:5">
 <p>You can of course shift to more readable units by supplying <code>-M</code> on the
 command line, or typing <code>E</code> while in <code>top</code>. If that doesn't work, consult the man
-page for your particular version of <code>top</code>.&#160;<a class="footnote-backref" href="#fnref:5" title="Jump back to footnote 6 in the text">&#8617;</a></p>
+page for your particular version of <code>top</code>.&#160;<a class="footnote-backref" href="#fnref:5" title="Jump back to footnote 5 in the text">&#8617;</a></p>
 </li>
 <li id="fn:6">
 <p>The <code>VSZ</code> column shows all memory accessible by the process, including shared
-libraries and memory in swap space. See <a href="https://stackoverflow.com/a/21049737">https://stackoverflow.com/a/21049737</a>&#160;<a class="footnote-backref" href="#fnref:6" title="Jump back to footnote 7 in the text">&#8617;</a></p>
+libraries and memory in swap space. See <a href="https://stackoverflow.com/a/21049737">https://stackoverflow.com/a/21049737</a>&#160;<a class="footnote-backref" href="#fnref:6" title="Jump back to footnote 6 in the text">&#8617;</a></p>
+</li>
+<li id="fn:0">
+<p>See footnote 2.&#160;<a class="footnote-backref" href="#fnref:0" title="Jump back to footnote 7 in the text">&#8617;</a></p>
 </li>
 </ol>
 </div>

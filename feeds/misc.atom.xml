@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>blog of daniel sabsay - misc</title><link href="https://dsabsay.github.io/blog/" rel="alternate"></link><link href="https://dsabsay.github.io/blog/feeds/misc.atom.xml" rel="self"></link><id>https://dsabsay.github.io/blog/</id><updated>2020-06-14T20:12:00-07:00</updated><entry><title>Debugging Docker Desktop for Mac: CPU utilization disguises swap space issue</title><link href="https://dsabsay.github.io/blog/debugging-docker-desktop-for-mac-cpu-utilization-disguises-swap-space-issue.html" rel="alternate"></link><published>2020-06-14T20:12:00-07:00</published><updated>2020-06-14T20:12:00-07:00</updated><author><name>Daniel Sabsay</name></author><id>tag:dsabsay.github.io,2020-06-14:/blog/debugging-docker-desktop-for-mac-cpu-utilization-disguises-swap-space-issue.html</id><summary type="html">&lt;div class="admonition note"&gt;
+<feed xmlns="http://www.w3.org/2005/Atom"><title>blog of daniel sabsay - misc</title><link href="https://dsabsay.github.io/blog/" rel="alternate"/><link href="https://dsabsay.github.io/blog/feeds/misc.atom.xml" rel="self"/><id>https://dsabsay.github.io/blog/</id><updated>2020-06-14T20:12:00-07:00</updated><entry><title>Debugging Docker Desktop for Mac: CPU utilization disguises swap space issue</title><link href="https://dsabsay.github.io/blog/debugging-docker-desktop-for-mac-cpu-utilization-disguises-swap-space-issue.html" rel="alternate"/><published>2020-06-14T20:12:00-07:00</published><updated>2020-06-14T20:12:00-07:00</updated><author><name>Daniel Sabsay</name></author><id>tag:dsabsay.github.io,2020-06-14:/blog/debugging-docker-desktop-for-mac-cpu-utilization-disguises-swap-space-issue.html</id><summary type="html">&lt;div class="admonition note"&gt;
 &lt;p class="admonition-title"&gt;TL;DR&lt;/p&gt;
 &lt;p&gt;If you're running Docker for Mac and experiencing massive CPU spikes 
 and slow response to Docker commands, ensure you've allocated enough 
@@ -8,7 +8,7 @@ memory and …&lt;/p&gt;&lt;/div&gt;</summary><content type="html">&lt;div class
 &lt;p&gt;If you're running Docker for Mac and experiencing massive CPU spikes 
 and slow response to Docker commands, ensure you've allocated enough 
 memory and swap space to Docker. You can use the command below to 
-inspect the Linux virtual machine that Docker is running in.&lt;sup id="fnref:0"&gt;&lt;a class="footnote-ref" href="#fn:0"&gt;1&lt;/a&gt;&lt;/sup&gt;&lt;/p&gt;
+inspect the Linux virtual machine that Docker is running in.&lt;sup id="fnref:0"&gt;&lt;a class="footnote-ref" href="#fn:0"&gt;7&lt;/a&gt;&lt;/sup&gt;&lt;/p&gt;
 &lt;p&gt;&lt;code&gt;docker run -it --rm --pid host alpine /bin/sh&lt;/code&gt;&lt;/p&gt;
 &lt;p&gt;Then run &lt;code&gt;top&lt;/code&gt; for CPU/mem usage and &lt;code&gt;iostat -m&lt;/code&gt; for IO stats.&lt;/p&gt;
 &lt;p&gt;In my case, the CPU spikes were caused by memory starvation; the 
@@ -53,7 +53,7 @@ containers at all, Docker CPU usage spikes (multiple times per day) and Docker
 commands lock up. I only noticed my problem &lt;em&gt;while running containers&lt;/em&gt;, but
 that's a detail I (mistakenly) didn't give enough consideration to.&lt;/p&gt;
 &lt;p&gt;The current hypothesis for the bug's cause involves filesystem
-synchronization between macOS and the Docker VM &lt;sup id="fnref:1"&gt;&lt;a class="footnote-ref" href="#fn:1"&gt;2&lt;/a&gt;&lt;/sup&gt;:&lt;/p&gt;
+synchronization between macOS and the Docker VM &lt;sup id="fnref:1"&gt;&lt;a class="footnote-ref" href="#fn:1"&gt;1&lt;/a&gt;&lt;/sup&gt;:&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;Things that can cause the infinite loop seem to involve syncing of file system
 events between OS-X and the docker VM. The fewer file system shares you have,
@@ -63,7 +63,7 @@ back and forth between the Docker VM and OS-X, just less chance of the issue.&lt
 &lt;p&gt;&lt;a href="https://github.com/docker/for-mac/issues/3499#issue-405295845"&gt;source (github.com)&lt;/a&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;I knew my Compose environment was utilizing bind mounts with potentially
-high read/write frequency &lt;sup id="fnref:2"&gt;&lt;a class="footnote-ref" href="#fn:2"&gt;3&lt;/a&gt;&lt;/sup&gt;, so it seemed plausible that this bug report and 
+high read/write frequency &lt;sup id="fnref:2"&gt;&lt;a class="footnote-ref" href="#fn:2"&gt;2&lt;/a&gt;&lt;/sup&gt;, so it seemed plausible that this bug report and 
 &lt;em&gt;my&lt;/em&gt; issue sprouted from the same core problem. Even if they didn't, the 
 mitigations
 proposed in the bug report gave me some easy ideas to try.&lt;/p&gt;
@@ -103,9 +103,8 @@ a PID 1 despite the fact there is already a PID 1 on the underlying system). Tur
 out it's pretty easy to break out of this isolation if you want to. By
 specifying the &lt;code&gt;host&lt;/code&gt; option, the container is given access to the host's PID
 namespace:&lt;/p&gt;
-&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;code&gt;docker run -it --rm --pid host &amp;lt;image name&amp;gt; &amp;lt;command&amp;gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;code&gt;docker&lt;span class="w"&gt; &lt;/span&gt;run&lt;span class="w"&gt; &lt;/span&gt;-it&lt;span class="w"&gt; &lt;/span&gt;--rm&lt;span class="w"&gt; &lt;/span&gt;--pid&lt;span class="w"&gt; &lt;/span&gt;host&lt;span class="w"&gt; &lt;/span&gt;&amp;lt;image&lt;span class="w"&gt; &lt;/span&gt;name&amp;gt;&lt;span class="w"&gt; &lt;/span&gt;&amp;lt;command&amp;gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
 
 &lt;p&gt;See &lt;a href="https://docs.docker.com/engine/reference/run/#pid-settings---pid"&gt;the Docker
 docs&lt;/a&gt; on the
@@ -117,9 +116,8 @@ which is in turn running on macOS.&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;Equipped with this new debugging ability, I can now look at what's happening in
 the Linux VM. I start a shell with this command:&lt;/p&gt;
-&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;code&gt;docker run -it --rm --pid host alpine /bin/sh
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;code&gt;docker&lt;span class="w"&gt; &lt;/span&gt;run&lt;span class="w"&gt; &lt;/span&gt;-it&lt;span class="w"&gt; &lt;/span&gt;--rm&lt;span class="w"&gt; &lt;/span&gt;--pid&lt;span class="w"&gt; &lt;/span&gt;host&lt;span class="w"&gt; &lt;/span&gt;alpine&lt;span class="w"&gt; &lt;/span&gt;/bin/sh
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-
 
 &lt;p&gt;and start looking around. I look at IO stats:&lt;/p&gt;
 &lt;p&gt;&lt;a class="img-link" href="https://dsabsay.github.io/blog/images/iostats_1.png"&gt;&lt;img alt="IO stats in Docker VM shows 890MB_read/s on a couple devices" src="https://dsabsay.github.io/blog/images/iostats_1.png"&gt;&lt;/a&gt;&lt;/p&gt;
@@ -138,14 +136,14 @@ same system stats.&lt;/p&gt;
 &lt;p&gt;&lt;a class="img-link" href="https://dsabsay.github.io/blog/images/iostats_2.png"&gt;&lt;img alt="IO stats in Docker VM shows roughly equivalent disk usage while running a
 single container" src="https://dsabsay.github.io/blog/images/iostats_2.png"&gt;&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;862MB of reads per second on two devices. Roughly the same as it was before. So
-I guess &lt;em&gt;that's&lt;/em&gt; not as unusual as I thought &lt;sup id="fnref:3"&gt;&lt;a class="footnote-ref" href="#fn:3"&gt;4&lt;/a&gt;&lt;/sup&gt;.&lt;/p&gt;
+I guess &lt;em&gt;that's&lt;/em&gt; not as unusual as I thought &lt;sup id="fnref:3"&gt;&lt;a class="footnote-ref" href="#fn:3"&gt;3&lt;/a&gt;&lt;/sup&gt;.&lt;/p&gt;
 &lt;p&gt;The &lt;code&gt;top&lt;/code&gt; output, however, was quite different:&lt;/p&gt;
 &lt;p&gt;&lt;a class="img-link" href="https://dsabsay.github.io/blog/images/top_2.png"&gt;&lt;img alt="top output while running single container is quite different" src="https://dsabsay.github.io/blog/images/top_2.png"&gt;&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;&lt;code&gt;usr&lt;/code&gt; CPU % is at 0, as are all processes on the system.&lt;/p&gt;
 &lt;p&gt;After seeing what these stats look like under working, normal conditions, I
 decide to look more closely at the top output from before. The process taking up
 the most CPU time is &lt;code&gt;[kswapd0]&lt;/code&gt;. It was holding at a steady 16% CPU
-utilization &lt;sup id="fnref:4"&gt;&lt;a class="footnote-ref" href="#fn:4"&gt;5&lt;/a&gt;&lt;/sup&gt;.&lt;/p&gt;
+utilization &lt;sup id="fnref:4"&gt;&lt;a class="footnote-ref" href="#fn:4"&gt;4&lt;/a&gt;&lt;/sup&gt;.&lt;/p&gt;
 &lt;p&gt;I wasn't sure what this process does. It took ~30 seconds to find what I needed 
 to know:&lt;/p&gt;
 &lt;blockquote&gt;
@@ -156,10 +154,10 @@ to know:&lt;/p&gt;
 &lt;p&gt;I look again at the &lt;code&gt;top&lt;/code&gt; output recorded in my notes, and realize something
 glaring I had overlooked before. Because &lt;code&gt;top&lt;/code&gt; by default prints memory stats in
 kilobytes, and my mushy brain doesn't really process numbers with that many
-digits, I hadn't payed much attention to the memory usage stats &lt;sup id="fnref:5"&gt;&lt;a class="footnote-ref" href="#fn:5"&gt;6&lt;/a&gt;&lt;/sup&gt;.&lt;/p&gt;
+digits, I hadn't payed much attention to the memory usage stats &lt;sup id="fnref:5"&gt;&lt;a class="footnote-ref" href="#fn:5"&gt;5&lt;/a&gt;&lt;/sup&gt;.&lt;/p&gt;
 &lt;p&gt;Some quick calculations showed that out of 2GB available memory in the Docker
 VM, only 2% was free! Further, the &lt;code&gt;VSZ&lt;/code&gt; column showed that several processes
-were using a large amount of memory &lt;sup id="fnref:6"&gt;&lt;a class="footnote-ref" href="#fn:6"&gt;7&lt;/a&gt;&lt;/sup&gt;.&lt;/p&gt;
+were using a large amount of memory &lt;sup id="fnref:6"&gt;&lt;a class="footnote-ref" href="#fn:6"&gt;6&lt;/a&gt;&lt;/sup&gt;.&lt;/p&gt;
 &lt;p&gt;I check my Docker settings, and find that I only have 2GB of memory (RAM)
 allocated to Docker and only 1GB of swap:&lt;/p&gt;
 &lt;p&gt;&lt;a class="img-link" href="https://dsabsay.github.io/blog/images/docker_resources.png"&gt;&lt;img alt="My Docker resources
@@ -244,40 +242,40 @@ the MB_read/s was calculated, I created a useless comparison.&lt;/p&gt;
 &lt;div class="footnote"&gt;
 &lt;hr&gt;
 &lt;ol&gt;
-&lt;li id="fn:0"&gt;
-&lt;p&gt;See footnote 2.&amp;#160;&lt;a class="footnote-backref" href="#fnref:0" title="Jump back to footnote 1 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
-&lt;/li&gt;
 &lt;li id="fn:1"&gt;
 &lt;p&gt;When you run Docker on your Mac, you're actually
 running a full Linux virtual machine. Since containers are essentially extensions of
 Linux kernel features, the way you run containers on macOS is by first running a
 Linux VM and then running your containers &lt;em&gt;in the VM&lt;/em&gt;. So, Docker for Mac can be
 seen as sort of a glue layer between macOS and the pure Linux Docker
-implementation. Now you know.&amp;#160;&lt;a class="footnote-backref" href="#fnref:1" title="Jump back to footnote 2 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+implementation. Now you know.&amp;#160;&lt;a class="footnote-backref" href="#fnref:1" title="Jump back to footnote 1 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;li id="fn:2"&gt;
 &lt;p&gt;One of the containers was running &lt;a href="https://prometheus.io/"&gt;Prometheus&lt;/a&gt;, a metrics-based monitoring tool
 that stores time series data on disk. The directory Prometheus was writing all
-its data to was bind-mounted to the macOS (host) filesystem.&amp;#160;&lt;a class="footnote-backref" href="#fnref:2" title="Jump back to footnote 3 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+its data to was bind-mounted to the macOS (host) filesystem.&amp;#160;&lt;a class="footnote-backref" href="#fnref:2" title="Jump back to footnote 2 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;li id="fn:3"&gt;
-&lt;p&gt;Actually, it probably &lt;em&gt;was&lt;/em&gt; abnormal. See &lt;a class="internal-link" href="#addendum"&gt;Addendum&lt;/a&gt;.&amp;#160;&lt;a class="footnote-backref" href="#fnref:3" title="Jump back to footnote 4 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Actually, it probably &lt;em&gt;was&lt;/em&gt; abnormal. See &lt;a class="internal-link" href="#addendum"&gt;Addendum&lt;/a&gt;.&amp;#160;&lt;a class="footnote-backref" href="#fnref:3" title="Jump back to footnote 3 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;li id="fn:4"&gt;
 &lt;p&gt;That in itself should have been enough to set my hairs up. I rarely see &lt;em&gt;any&lt;/em&gt;
-process consume such a consistent amount of time on the CPU.&amp;#160;&lt;a class="footnote-backref" href="#fnref:4" title="Jump back to footnote 5 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+process consume such a consistent amount of time on the CPU.&amp;#160;&lt;a class="footnote-backref" href="#fnref:4" title="Jump back to footnote 4 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;li id="fn:5"&gt;
 &lt;p&gt;You can of course shift to more readable units by supplying &lt;code&gt;-M&lt;/code&gt; on the
 command line, or typing &lt;code&gt;E&lt;/code&gt; while in &lt;code&gt;top&lt;/code&gt;. If that doesn't work, consult the man
-page for your particular version of &lt;code&gt;top&lt;/code&gt;.&amp;#160;&lt;a class="footnote-backref" href="#fnref:5" title="Jump back to footnote 6 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+page for your particular version of &lt;code&gt;top&lt;/code&gt;.&amp;#160;&lt;a class="footnote-backref" href="#fnref:5" title="Jump back to footnote 5 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;li id="fn:6"&gt;
 &lt;p&gt;The &lt;code&gt;VSZ&lt;/code&gt; column shows all memory accessible by the process, including shared
-libraries and memory in swap space. See &lt;a href="https://stackoverflow.com/a/21049737"&gt;https://stackoverflow.com/a/21049737&lt;/a&gt;&amp;#160;&lt;a class="footnote-backref" href="#fnref:6" title="Jump back to footnote 7 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+libraries and memory in swap space. See &lt;a href="https://stackoverflow.com/a/21049737"&gt;https://stackoverflow.com/a/21049737&lt;/a&gt;&amp;#160;&lt;a class="footnote-backref" href="#fnref:6" title="Jump back to footnote 6 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li id="fn:0"&gt;
+&lt;p&gt;See footnote 2.&amp;#160;&lt;a class="footnote-backref" href="#fnref:0" title="Jump back to footnote 7 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
-&lt;/div&gt;</content><category term="misc"></category><category term="debugging"></category><category term="docker"></category><category term="linux"></category></entry><entry><title>Book Review: The Rise of Superman: Decoding the Science of Ultimate Human Performance</title><link href="https://dsabsay.github.io/blog/book-review-the-rise-of-superman-decoding-the-science-of-ultimate-human-performance.html" rel="alternate"></link><published>2020-05-14T19:16:00-07:00</published><updated>2020-05-14T19:16:00-07:00</updated><author><name>Daniel Sabsay</name></author><id>tag:dsabsay.github.io,2020-05-14:/blog/book-review-the-rise-of-superman-decoding-the-science-of-ultimate-human-performance.html</id><summary type="html">&lt;!-- Status: draft --&gt;
+&lt;/div&gt;</content><category term="misc"/><category term="debugging"/><category term="docker"/><category term="linux"/></entry><entry><title>Book Review: The Rise of Superman: Decoding the Science of Ultimate Human Performance</title><link href="https://dsabsay.github.io/blog/book-review-the-rise-of-superman-decoding-the-science-of-ultimate-human-performance.html" rel="alternate"/><published>2020-05-14T19:16:00-07:00</published><updated>2020-05-14T19:16:00-07:00</updated><author><name>Daniel Sabsay</name></author><id>tag:dsabsay.github.io,2020-05-14:/blog/book-review-the-rise-of-superman-decoding-the-science-of-ultimate-human-performance.html</id><summary type="html">&lt;!-- Status: draft --&gt;
 
 &lt;p&gt;&lt;a href="https://www.stevenkotler.com/book-pages/the-rise-of-super-man"&gt;The Rise of Superman: Decoding the Science of Ultimate Human Performance&lt;/a&gt;
 by Steven Kotler&lt;/p&gt;
@@ -423,7 +421,7 @@ alone. Here are some loosely related ideas that I found interesting:&lt;/p&gt;
 &lt;/ul&gt;
 &lt;/li&gt;
 &lt;/ul&gt;
-&lt;h2 id="style-1"&gt;&lt;a class="toclink" href="#style-1"&gt;Style &lt;sup id="fnref:1"&gt;&lt;a class="footnote-ref" href="#fn:1"&gt;1&lt;/a&gt;&lt;/sup&gt;&lt;/a&gt;&lt;a class="headerlink" href="#style-1" title="Permanent link"&gt;&amp;para;&lt;/a&gt;&lt;/h2&gt;
+&lt;h2 id="style"&gt;&lt;a class="toclink" href="#style"&gt;Style &lt;sup id="fnref:1"&gt;&lt;a class="footnote-ref" href="#fn:1"&gt;1&lt;/a&gt;&lt;/sup&gt;&lt;/a&gt;&lt;a class="headerlink" href="#style" title="Permanent link"&gt;&amp;para;&lt;/a&gt;&lt;/h2&gt;
 &lt;p&gt;The narrative tends to jump around quite often (from sport to sport and athlete
 to athlete), requiring context switches that were jarring at times.&lt;/p&gt;
 &lt;p&gt;Aside from this, the writing is approachable. Reads more like a long news
@@ -543,4 +541,4 @@ seeing the results of each small change you make. It's very engaging.&lt;/p&gt;
 say a few words regarding style in my book reviews.&amp;#160;&lt;a class="footnote-backref" href="#fnref:1" title="Jump back to footnote 1 in the text"&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
-&lt;/div&gt;</content><category term="misc"></category><category term="reading"></category><category term="books"></category><category term="flow"></category></entry></feed>
+&lt;/div&gt;</content><category term="misc"/><category term="reading"/><category term="books"/><category term="flow"/></entry></feed>
