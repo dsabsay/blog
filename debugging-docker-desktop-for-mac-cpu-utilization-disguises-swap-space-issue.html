@@ -64,8 +64,8 @@ successfully one or two times. But then things would go south. The tests started
 failing. The Docker daemon took <em>ages</em> to respond to simple commands. Meanwhile,
 my laptop fans kicked into high gear and I noticed something peculiar:</p>
 <figure>
-    <a class="img-link" href="https://dsabsay.github.io/blog">
-        <img src="https://dsabsay.github.io/blog" alt="Activity Monitor 
+    <a class="img-link" href="https://dsabsay.github.io/blog/images/activity_monitor.png">
+        <img src="https://dsabsay.github.io/blog/images/activity_monitor.png" alt="Activity Monitor 
         shows 669% CPU utilization for com.docker.hyperkit">
     </a>
     <figcaption>Activity Monitor shows 669% CPU utilization for com.docker.hyperkit</figcaption>
@@ -151,11 +151,11 @@ the Linux VM. I start a shell with this command:</p>
 </code></pre></div>
 
 <p>and start looking around. I look at IO stats:</p>
-<p><a class="img-link" href="https://dsabsay.github.io/blog"><img alt="IO stats in Docker VM shows 890MB_read/s on a couple devices" src="https://dsabsay.github.io/blog"></a></p>
+<p><a class="img-link" href="https://dsabsay.github.io/blog/images/iostats_1.png"><img alt="IO stats in Docker VM shows 890MB_read/s on a couple devices" src="https://dsabsay.github.io/blog/images/iostats_1.png"></a></p>
 <p>Wow! 890MB of reads per second?! Seems kinda crazy. But I don't know if it's 
 unusual, as I don't know what "normal" looks like.</p>
 <p>I look at <code>top</code> output:</p>
-<p><a class="img-link" href="https://dsabsay.github.io/blog"><img alt="top output of Docker VM while running problematic containers" src="https://dsabsay.github.io/blog"></a></p>
+<p><a class="img-link" href="https://dsabsay.github.io/blog/images/top_1.png"><img alt="top output of Docker VM while running problematic containers" src="https://dsabsay.github.io/blog/images/top_1.png"></a></p>
 <p>I don't see anything too alarming, although the 92% user CPU usage is pretty dang
 high. But I already knew that was happening. I don't see any obvious rogue
 processes.</p>
@@ -164,12 +164,12 @@ decide whether any of this was out of line. So I stopped all my
 "problem" containers, started up a single MongoDB container, and looked at the
 same system stats.</p>
 <p>First, the IO stats:</p>
-<p><a class="img-link" href="https://dsabsay.github.io/blog"><img alt="IO stats in Docker VM shows roughly equivalent disk usage while running a
-single container" src="https://dsabsay.github.io/blog"></a></p>
+<p><a class="img-link" href="https://dsabsay.github.io/blog/images/iostats_2.png"><img alt="IO stats in Docker VM shows roughly equivalent disk usage while running a
+single container" src="https://dsabsay.github.io/blog/images/iostats_2.png"></a></p>
 <p>862MB of reads per second on two devices. Roughly the same as it was before. So
 I guess <em>that's</em> not as unusual as I thought <sup id="fnref:3"><a class="footnote-ref" href="#fn:3">3</a></sup>.</p>
 <p>The <code>top</code> output, however, was quite different:</p>
-<p><a class="img-link" href="https://dsabsay.github.io/blog"><img alt="top output while running single container is quite different" src="https://dsabsay.github.io/blog"></a></p>
+<p><a class="img-link" href="https://dsabsay.github.io/blog/images/top_2.png"><img alt="top output while running single container is quite different" src="https://dsabsay.github.io/blog/images/top_2.png"></a></p>
 <p><code>usr</code> CPU % is at 0, as are all processes on the system.</p>
 <p>After seeing what these stats look like under working, normal conditions, I
 decide to look more closely at the top output from before. The process taking up
@@ -191,8 +191,8 @@ VM, only 2% was free! Further, the <code>VSZ</code> column showed that several p
 were using a large amount of memory <sup id="fnref:6"><a class="footnote-ref" href="#fn:6">6</a></sup>.</p>
 <p>I check my Docker settings, and find that I only have 2GB of memory (RAM)
 allocated to Docker and only 1GB of swap:</p>
-<p><a class="img-link" href="https://dsabsay.github.io/blog"><img alt="My Docker resources
-settings" src="https://dsabsay.github.io/blog"></a></p>
+<p><a class="img-link" href="https://dsabsay.github.io/blog/images/docker_resources.png"><img alt="My Docker resources
+settings" src="https://dsabsay.github.io/blog/images/docker_resources.png"></a></p>
 <p>I change the swap to 4GB, start up all my containers, and everything runs
 beautifully! <code>usr</code> CPU usage in the Docker VM is at 4%, <code>kswpad0</code> CPU usage is at
 0%, and <code>com.docker.hyperkit</code> is hovering at around 115% CPU usage. This latter
