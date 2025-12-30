@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>daniel sabsay</title>
+  <link rel="stylesheet" type="text/css" href="https://danielsabsay.com/theme/css/main.css" />
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1><a class="internal-link no-underline" href="https://danielsabsay.com/">daniel sabsay</a></h1>
+      <nav>
+        <ul>
+              <li >
+                <a class='internal-link' href="https://danielsabsay.com/./">About</a>
+              </li>
+              <li >
+                <a class='internal-link' href="https://danielsabsay.com/pages/music-tools.html">Music Tools</a>
+              </li>
+            <li  class="active">
+              <a class='internal-link' href="https://danielsabsay.com/blog/">Blog</a>
+            </li>
+          <li>
+            <hr class="footer-hr"/>
+          </li>
+        </ul>
+      </nav>
+    </header>
+    <div class="content">
+<h2 class="article-title">2025 Year in Review - Flaky tests in Cortex</h2>
+<p class="article-date">Mon 29 December 2025 ▪︎  <a class="tag internal-link" href="https://danielsabsay.com/tag/cortex.html">cortex</a> <a class="tag internal-link" href="https://danielsabsay.com/tag/testing.html">testing</a> <a class="tag internal-link" href="https://danielsabsay.com/tag/software-development.html">software-development</a></p>
+
+<div class="article-content">
+<h2 id="introduction"><a class="toclink" href="#introduction">Introduction</a><a class="headerlink" href="#introduction" title="Permanent link">&para;</a></h2>
+<p>In 2025, a total of 16 flaky tests were addressed in the <a href="https://github.com/cortexproject/cortex">cortex</a> codebase. In most cases, the flaky tests were fixed by code changes to either test or non-test code while keeping the test in place. In a few cases, the flaky tests were disabled. This document is an analysis of the 16 tests addressed: their causes, locations, and usefulness as indicators of real problems.</p>
+<p>Most flaky tests analyzed were caused by race conditions in test code or incorrect assumptions about map iteration order in Go. The tests exposed problems in non-test code about as often as they didn't, indicating that flaky test failures should continue to be investigated.</p>
+<h2 id="takeaways-for-test-writers"><a class="toclink" href="#takeaways-for-test-writers">Takeaways for test writers</a><a class="headerlink" href="#takeaways-for-test-writers" title="Permanent link">&para;</a></h2>
+<p>Based on the analysis of tests addressed in Cortex in 2025, here is a short list of lessons applicable to many Go projects that, if kept in mind, would likely allow one to avoid some flaky tests:</p>
+<ul>
+<li>Map iteration order in Go is undefined. It can change from one execution to the next: <a href="[https://go.dev/ref/spec#RangeClause](https://go.dev/ref/spec#RangeClause)">ref</a></li>
+<li>If multiple communications can continue in a single <code>select</code> statement (e.g. multiple channels have messages in them), one of them is picked pseudo-randomly: <a href="https://go.dev/ref/spec#Select_statements">ref</a></li>
+<li>Use synchronous operations in tests if available, or explicitly wait for asynchronous operations to complete.</li>
+<li>Be careful with floating point comparisons. Besides the typical advice of comparing with allowance for small differences, see also <a href="https://pkg.go.dev/strconv#ParseFloat">strconv.ParseFloat()</a> and <a href="https://pkg.go.dev/strconv#FormatFloat">strconv.FormatFloat()</a> for an idea of issues that might occur when floating point numbers are serialized.</li>
+</ul>
+<h2 id="background"><a class="toclink" href="#background">Background</a><a class="headerlink" href="#background" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p>A <strong>flaky test</strong> is an automated test that, with no changes made to the test code or the code under test, passes on some invocations but fails on others. Flaky tests slow down progress and waste CI and human time. I am studying them in hopes to improve the experience of cortex project contributors.</p>
+</blockquote>
+<p>For background, <a href="https://cortexmetrics.io">Cortex</a> is a distributed time-series database written in Go, based on the <a href="https://prometheus.io">Prometheus</a> data model. It is generally used for monitoring web services and server compute infrastructure. Cortex ingests metrics, can perform a variety of mathematic operations on those metrics, and exposes additional HTTP APIs for managing various functions. It is unnecessary to know the details of Cortex to understand the analysis below. The most important thing to know is that Cortex is highly concurrent (even within individual processes in the distributed system).</p>
+<h2 id="causes-of-flaky-tests"><a class="toclink" href="#causes-of-flaky-tests">Causes of flaky tests</a><a class="headerlink" href="#causes-of-flaky-tests" title="Permanent link">&para;</a></h2>
+<p>Of the 16 tests addressed in 2025, the underlying cause of the flaky behavior can be broken down into several categories:</p>
+<p><a class="img-link" href="https://danielsabsay.com/images/2025_cortex_flaky_tests_by_cause.png"><img alt="Venn diagram showing flaky tests by cause" src="https://danielsabsay.com/images/2025_cortex_flaky_tests_by_cause.png"></a></p>
+<p>The meaning of each cause is given below:</p>
+<ul>
+<li><strong>Race in Test:</strong> A race condition in the test code/harness caused intermittent failures.</li>
+<li><strong>Race in Production:</strong> A race condition in non-test code caused flaky behavior. This also means the race may be happening in production.</li>
+<li><strong>Sorting:</strong> Some test cases assumed that sorting occurred when it didn't, leading to intermittent failures.</li>
+<li><strong>RNG:</strong> Some tests failed intermittently due to randomness from random number generators. Generally speaking, with enough iterations using an RNG, a test might eventually uncover an edge case not properly handled by the code. Randomness might be used to choose between multiple available options. When code depends on which one is chosen first, unpredictable behavior can ensue.</li>
+<li><strong>Floating Point Comparison:</strong> Exact equality checks between floating point numbers caused intermittent test failures even when the difference between the numbers was small enough to be acceptable. The failures were flaky because they occurred in fuzz tests where different numbers are compared in each iteration of the test.</li>
+<li><strong>Floating Point (De)Serialization:</strong> Floating point serialization and deserialization introduced precision issues, causing comparisons to fail. The failures were flaky because they occurred in fuzz tests where different numbers are compared in each iteration of the test.</li>
+<li><strong>Unknown:</strong> The test was disabled and investigation of the underlying cause is incomplete.</li>
+</ul>
+<p>In the set of tests analyzed, the most common causes of flakiness (making up a combined total of 50% of the flaky tests) were race conditions in test code and sorting problems.</p>
+<h3 id="race-conditions-in-test-code"><a class="toclink" href="#race-conditions-in-test-code">Race conditions in test code</a><a class="headerlink" href="#race-conditions-in-test-code" title="Permanent link">&para;</a></h3>
+<p>What do race conditions in test code look like? Sometimes they are easy to spot and fix, like this one:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">func</span><span class="w"> </span><span class="nx">TestSchedulerShutdown_FrontendLoop</span><span class="p">(</span><span class="nx">t</span><span class="w"> </span><span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">T</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">scheduler</span><span class="p">,</span><span class="w"> </span><span class="nx">frontendClient</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">setupScheduler</span><span class="p">(</span><span class="nx">t</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span><span class="p">)</span>
+
+<span class="w">    </span><span class="nx">frontendLoop</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">initFrontendLoop</span><span class="p">(</span><span class="nx">t</span><span class="p">,</span><span class="w"> </span><span class="nx">frontendClient</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;frontend-12345&quot;</span><span class="p">)</span>
+
+<span class="w">    </span><span class="c1">// Stop the scheduler. This will disable receiving new requests from frontends.</span>
+<span class="w">    </span><span class="nx">scheduler</span><span class="p">.</span><span class="nx">StopAsync</span><span class="p">()</span>
+
+<span class="w">    </span><span class="c1">// We can still send request to scheduler, but we get shutdown error back.</span>
+<span class="w">    </span><span class="nx">require</span><span class="p">.</span><span class="nx">NoError</span><span class="p">(</span><span class="nx">t</span><span class="p">,</span><span class="w"> </span><span class="nx">frontendLoop</span><span class="p">.</span><span class="nx">Send</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">schedulerpb</span><span class="p">.</span><span class="nx">FrontendToScheduler</span><span class="p">{</span>
+<span class="w">        </span><span class="nx">Type</span><span class="p">:</span><span class="w">        </span><span class="nx">schedulerpb</span><span class="p">.</span><span class="nx">ENQUEUE</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">QueryID</span><span class="p">:</span><span class="w">     </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">UserID</span><span class="p">:</span><span class="w">      </span><span class="s">&quot;test&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">HttpRequest</span><span class="p">:</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">httpgrpc</span><span class="p">.</span><span class="nx">HTTPRequest</span><span class="p">{</span><span class="nx">Method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;GET&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">Url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/hello&quot;</span><span class="p">},</span>
+<span class="w">    </span><span class="p">}))</span>
+
+<span class="w">    </span><span class="nx">msg</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">frontendLoop</span><span class="p">.</span><span class="nx">Recv</span><span class="p">()</span>
+<span class="w">    </span><span class="nx">require</span><span class="p">.</span><span class="nx">NoError</span><span class="p">(</span><span class="nx">t</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="w">    </span><span class="nx">require</span><span class="p">.</span><span class="nx">True</span><span class="p">(</span><span class="nx">t</span><span class="p">,</span><span class="w"> </span><span class="nx">msg</span><span class="p">.</span><span class="nx">Status</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nx">schedulerpb</span><span class="p">.</span><span class="nx">SHUTTING_DOWN</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>In the above test, an async shutdown operation was started. The test immediately continued, clearly under the assumption that the shutdown should have completed (see the final check). Sometimes the shutdown completed before the final check; sometimes it didn't. The fix was to make the main test goroutine block until the shutdown operation completed.</p>
+<blockquote>
+<p>Note: This is a case where having both synchronous and asynchronous versions of an operation might be useful.</p>
+</blockquote>
+<p>Sometimes race conditions in tests can be harder to spot, such as this one:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">func</span><span class="w"> </span><span class="nx">TestMockKV_Watch</span><span class="p">(</span><span class="nx">t</span><span class="w"> </span><span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">T</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// setupWatchTest spawns a goroutine to watch for events matching a particular key</span>
+<span class="w">    </span><span class="c1">// emitted by a mockKV. Any observed events are sent to callers via the returned channel.</span>
+<span class="w">    </span><span class="c1">// The goroutine can be stopped using the return cancel function and waited for using the</span>
+<span class="w">    </span><span class="c1">// returned wait group.</span>
+<span class="w">    </span><span class="nx">setupWatchTest</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">key</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">prefix</span><span class="w"> </span><span class="kt">bool</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="nx">mockKV</span><span class="p">,</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">CancelFunc</span><span class="p">,</span><span class="w"> </span><span class="kd">chan</span><span class="w"> </span><span class="o">*</span><span class="nx">clientv3</span><span class="p">.</span><span class="nx">Event</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="nx">sync</span><span class="p">.</span><span class="nx">WaitGroup</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">kv</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">newMockKV</span><span class="p">()</span>
+<span class="w">        </span><span class="c1">// Use a condition to make sure the goroutine has started using the watch before</span>
+<span class="w">        </span><span class="c1">// we do anything to the mockKV that would emit an event the watcher is expecting</span>
+<span class="w">        </span><span class="nx">cond</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">sync</span><span class="p">.</span><span class="nx">NewCond</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">sync</span><span class="p">.</span><span class="nx">Mutex</span><span class="p">{})</span>
+<span class="w">        </span><span class="nx">wg</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">sync</span><span class="p">.</span><span class="nx">WaitGroup</span><span class="p">{}</span>
+<span class="w">        </span><span class="nx">ch</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nb">make</span><span class="p">(</span><span class="kd">chan</span><span class="w"> </span><span class="o">*</span><span class="nx">clientv3</span><span class="p">.</span><span class="nx">Event</span><span class="p">)</span>
+<span class="w">        </span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">cancel</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">WithCancel</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">())</span>
+
+<span class="w">        </span><span class="nx">wg</span><span class="p">.</span><span class="nx">Add</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="w">        </span><span class="k">go</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">defer</span><span class="w"> </span><span class="nx">wg</span><span class="p">.</span><span class="nx">Done</span><span class="p">()</span>
+
+<span class="w">            </span><span class="kd">var</span><span class="w"> </span><span class="nx">ops</span><span class="w"> </span><span class="p">[]</span><span class="nx">clientv3</span><span class="p">.</span><span class="nx">OpOption</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="nx">prefix</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nx">ops</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[]</span><span class="nx">clientv3</span><span class="p">.</span><span class="nx">OpOption</span><span class="p">{</span><span class="nx">clientv3</span><span class="p">.</span><span class="nx">WithPrefix</span><span class="p">()}</span>
+<span class="w">            </span><span class="p">}</span>
+
+<span class="w">            </span><span class="nx">watch</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">kv</span><span class="p">.</span><span class="nx">Watch</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">key</span><span class="p">,</span><span class="w"> </span><span class="nx">ops</span><span class="o">...</span><span class="p">)</span>
+<span class="w">            </span><span class="nx">cond</span><span class="p">.</span><span class="nx">Broadcast</span><span class="p">()</span>
+
+<span class="w">            </span><span class="k">for</span><span class="w"> </span><span class="nx">e</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="nx">watch</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="k">if</span><span class="w"> </span><span class="nb">len</span><span class="p">(</span><span class="nx">e</span><span class="p">.</span><span class="nx">Events</span><span class="p">)</span><span class="w"> </span><span class="p">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="nx">ch</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nx">e</span><span class="p">.</span><span class="nx">Events</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}()</span>
+
+<span class="w">        </span><span class="c1">// Wait for the watcher goroutine to start actually watching</span>
+<span class="w">        </span><span class="nx">cond</span><span class="p">.</span><span class="nx">L</span><span class="p">.</span><span class="nx">Lock</span><span class="p">()</span>
+<span class="w">        </span><span class="nx">cond</span><span class="p">.</span><span class="nx">Wait</span><span class="p">()</span>
+<span class="w">        </span><span class="nx">cond</span><span class="p">.</span><span class="nx">L</span><span class="p">.</span><span class="nx">Unlock</span><span class="p">()</span>
+
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nx">kv</span><span class="p">,</span><span class="w"> </span><span class="nx">cancel</span><span class="p">,</span><span class="w"> </span><span class="nx">ch</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">wg</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="nx">t</span><span class="p">.</span><span class="nx">Run</span><span class="p">(</span><span class="s">&quot;watch stopped by context&quot;</span><span class="p">,</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">t</span><span class="w"> </span><span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">T</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Ensure we can use the cancel method of the context given to the watch</span>
+<span class="w">        </span><span class="c1">// to stop the watch</span>
+<span class="w">        </span><span class="nx">_</span><span class="p">,</span><span class="w"> </span><span class="nx">cancel</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="p">,</span><span class="w"> </span><span class="nx">wg</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">setupWatchTest</span><span class="p">(</span><span class="s">&quot;/bar&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">)</span>
+<span class="w">        </span><span class="nx">cancel</span><span class="p">()</span>
+<span class="w">        </span><span class="nx">wg</span><span class="p">.</span><span class="nx">Wait</span><span class="p">()</span>
+<span class="w">    </span><span class="p">})</span>
+
+<span class="o">...</span>
+</code></pre></div>
+
+<p>This example comes from a mock key-value database client in Cortex. The test harness shown above starts a goroutine to watch for events on a channel, sending them to another channel where assertions will be made on them.</p>
+<p>The problem is that <a href="https://pkg.go.dev/sync#Cond.Wait"><code>cond.Wait()</code></a> is effectively blocking until <a href="https://pkg.go.dev/sync#Cond.Broadcast"><code>cond.Broadcast()</code></a> is called but depending on execution order of the goroutines, that might happen <em>before</em> the main test goroutine reaches the <code>cond.Wait()</code> call. If that happens, <code>cond.Wait()</code> blocks indefinitely because there was only one call to <code>Broadcast()</code> that could unblock it but it already happened, so the test deadlocks.</p>
+<p>This issue was solved by replacing <code>sync.Cond</code> with an additional <a href="https://pkg.go.dev/sync#WaitGroup"><code>sync.WaitGroup</code></a> and the appropriate calls to <code>Done()</code> and <code>Wait()</code>.</p>
+<h3 id="sorting-problems"><a class="toclink" href="#sorting-problems">Sorting problems</a><a class="headerlink" href="#sorting-problems" title="Permanent link">&para;</a></h3>
+<p>Sorting was the cause of 4 flaky tests in this review. The issue at the root of all 4 tests was code that assumed golang map iteration order is consistent. It is not:</p>
+<blockquote>
+<p>The iteration order over maps is not specified and is not guaranteed to be the same from one iteration to the next. 
+<a href="https://go.dev/ref/spec#RangeClause">https://go.dev/ref/spec#RangeClause</a></p>
+</blockquote>
+<p>Here is an example from the test set:</p>
+<div class="highlight"><pre><span></span><code><span class="nx">childFragmentIDs</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nb">make</span><span class="p">(</span><span class="kd">map</span><span class="p">[</span><span class="kt">uint64</span><span class="p">]</span><span class="kt">bool</span><span class="p">)</span>
+<span class="nx">children</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="nx">current</span><span class="p">).</span><span class="nx">Children</span><span class="p">()</span>
+
+<span class="o">...</span>
+
+<span class="nx">childIDs</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nb">make</span><span class="p">([]</span><span class="kt">uint64</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nb">len</span><span class="p">(</span><span class="nx">childFragmentIDs</span><span class="p">))</span>
+<span class="k">for</span><span class="w"> </span><span class="nx">fragmentID</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="nx">childFragmentIDs</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">childIDs</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nb">append</span><span class="p">(</span><span class="nx">childIDs</span><span class="p">,</span><span class="w"> </span><span class="nx">fragmentID</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="o">...</span>
+</code></pre></div>
+
+<p>The order of <code>childIDs</code> is undefined. Assuming that the order of this slice is irrelevant, comparisons made in tests must ignore order, otherwise they will fail intermittently.</p>
+<p>A more sinister version of the same problem can be seen in this example:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">t</span><span class="w"> </span><span class="o">*</span><span class="nx">DiscardedSeriesTracker</span><span class="p">)</span><span class="w"> </span><span class="nx">UpdateMetrics</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">usersToDelete</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nb">make</span><span class="p">([]</span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span>
+<span class="w">    </span><span class="nx">t</span><span class="p">.</span><span class="nx">RLock</span><span class="p">()</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="nx">reason</span><span class="p">,</span><span class="w"> </span><span class="nx">userCounter</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="nx">t</span><span class="p">.</span><span class="nx">reasonUserMap</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">userCounter</span><span class="p">.</span><span class="nx">RLock</span><span class="p">()</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="nx">user</span><span class="p">,</span><span class="w"> </span><span class="nx">seriesCounter</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="nx">userCounter</span><span class="p">.</span><span class="nx">userSeriesMap</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">seriesCounter</span><span class="p">.</span><span class="nx">Lock</span><span class="p">()</span>
+<span class="w">            </span><span class="nx">count</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nb">len</span><span class="p">(</span><span class="nx">seriesCounter</span><span class="p">.</span><span class="nx">seriesCountMap</span><span class="p">)</span>
+<span class="w">            </span><span class="nx">t</span><span class="p">.</span><span class="nx">discardedSeriesGauge</span><span class="p">.</span><span class="nx">WithLabelValues</span><span class="p">(</span><span class="nx">reason</span><span class="p">,</span><span class="w"> </span><span class="nx">user</span><span class="p">).</span><span class="nx">Set</span><span class="p">(</span><span class="nb">float64</span><span class="p">(</span><span class="nx">count</span><span class="p">))</span>
+<span class="w">            </span><span class="nb">clear</span><span class="p">(</span><span class="nx">seriesCounter</span><span class="p">.</span><span class="nx">seriesCountMap</span><span class="p">)</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="nx">count</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nx">usersToDelete</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nb">append</span><span class="p">(</span><span class="nx">usersToDelete</span><span class="p">,</span><span class="w"> </span><span class="nx">user</span><span class="p">)</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">            </span><span class="nx">seriesCounter</span><span class="p">.</span><span class="nx">Unlock</span><span class="p">()</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="nx">userCounter</span><span class="p">.</span><span class="nx">RUnlock</span><span class="p">()</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nb">len</span><span class="p">(</span><span class="nx">usersToDelete</span><span class="p">)</span><span class="w"> </span><span class="p">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">userCounter</span><span class="p">.</span><span class="nx">Lock</span><span class="p">()</span>
+<span class="w">            </span><span class="k">for</span><span class="w"> </span><span class="nx">_</span><span class="p">,</span><span class="w"> </span><span class="nx">user</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="nx">usersToDelete</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="k">if</span><span class="w"> </span><span class="nx">_</span><span class="p">,</span><span class="w"> </span><span class="nx">ok</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">userCounter</span><span class="p">.</span><span class="nx">userSeriesMap</span><span class="p">[</span><span class="nx">user</span><span class="p">];</span><span class="w"> </span><span class="nx">ok</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="nx">t</span><span class="p">.</span><span class="nx">discardedSeriesGauge</span><span class="p">.</span><span class="nx">DeleteLabelValues</span><span class="p">(</span><span class="nx">reason</span><span class="p">,</span><span class="w"> </span><span class="nx">user</span><span class="p">)</span>
+<span class="w">                    </span><span class="nb">delete</span><span class="p">(</span><span class="nx">userCounter</span><span class="p">.</span><span class="nx">userSeriesMap</span><span class="p">,</span><span class="w"> </span><span class="nx">user</span><span class="p">)</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">            </span><span class="nx">userCounter</span><span class="p">.</span><span class="nx">Unlock</span><span class="p">()</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="nx">t</span><span class="p">.</span><span class="nx">RUnlock</span><span class="p">()</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Depending on the order of reasons in the iteration of <code>t.reasonUserMap</code>, this code can delete data from users it shouldn't. To see how, imagine we have two reasons <code>reason1</code> and <code>reason2</code>. On the first iteration say we pick <code>reason1</code> (implicitly this is a random choice made by the go compiler/runtime). We decide that <code>user123</code> needs to be deleted. Then the next iteration of the outer loop occurs, for <code>reason2</code>. Imagine we decide no users need to be deleted. Unfortunately, we still have <code>user123</code> in the <code>usersToDelete</code> slice, so it will be deleted from the data associated with <code>reason2</code>.</p>
+<p>Unlike the earlier example, where the solution was to explicitly ignore the order of the slice, the solution here is to properly scope the variable <code>usersToDelete</code> so it is re-initialized at the beginning of each iteration of the outer loop.</p>
+<h2 id="locations-of-flaky-tests"><a class="toclink" href="#locations-of-flaky-tests">Locations of flaky tests</a><a class="headerlink" href="#locations-of-flaky-tests" title="Permanent link">&para;</a></h2>
+<p>Flaky tests addressed in 2025 were spread across several parts of the codebase:</p>
+<p><a class="img-link" href="https://danielsabsay.com/images/2025_cortex_flaky_tests_by_component.png"><img alt="Venn diagram showing flaky tests by component" src="https://danielsabsay.com/images/2025_cortex_flaky_tests_by_component.png"></a></p>
+<p>The biggest single component by number of flaky tests is the query fuzz tests (located <a href="https://github.com/cortexproject/cortex/blob/5221cbaf50e86763a362158ae5fb8619e17d2c3e/integration/query_fuzz_test.go">here</a>). Of the 5 flaky tests addressed in this area of the codebase, 2 involved floating point comparisons that were fixed by adjusting the comparison logic. The remaining 3 tests were disabled.</p>
+<p>The 3 flaky tests in the <code>ring</code> package do not share any notable similarities with each other.</p>
+<h2 id="usefulness-of-flaky-tests"><a class="toclink" href="#usefulness-of-flaky-tests">Usefulness of flaky tests</a><a class="headerlink" href="#usefulness-of-flaky-tests" title="Permanent link">&para;</a></h2>
+<p>Of the 16 flaky tests addressed in 2025, many of them were caused by problems in test code. However, a similar number of tests exposed problems in non-test code: problems that could happen in production. A full breakdown is below:</p>
+<p><a class="img-link" href="https://danielsabsay.com/images/2025_cortex_flaky_tests_by_validity.png"><img alt="Venn diagram showing flaky tests by whether they exposed problems in non-test code or not" src="https://danielsabsay.com/images/2025_cortex_flaky_tests_by_validity.png"></a></p>
+<p>From this, I tentatively conclude that flaky test failures <em>should</em> continue to be investigated instead of being disabled. They expose problems in non-test (i.e. production) code about as often as they don't.</p>
+<p>The "Don't know" category represents the 3 fuzz tests that were disabled. Investigation of their cause of flakiness is incomplete.</p>
+<h2 id="method"><a class="toclink" href="#method">Method</a><a class="headerlink" href="#method" title="Permanent link">&para;</a></h2>
+<p>These are the steps I took to compile this report:</p>
+<ol>
+<li>Performed the following searches in GitHub and pulled the results into a spreadsheet<ol>
+<li><code>is:issue state:closed flaky closed:&gt;=2025-01-01</code></li>
+<li><code>is:pr is:closed flaky closed:&gt;=2025-01-01</code></li>
+</ol>
+</li>
+<li>Deduplicated results from the two different searches</li>
+<li>Removed irrelevant issues and PRs (because they were closed without merging, were unrelated to flaky tests, etc.)</li>
+<li>Reviewed the code changes and discussions for each issue and recorded the following information for each one:<ol>
+<li>Component where the issue occurred</li>
+<li>Cause of the flakiness</li>
+<li>Whether the fix involved changes to non-test code</li>
+<li>Whether the test failures exposed problems in non-test code (this was done as a second pass after "fix involved changes to non-test code" and was mainly to double-check this facet from a slightly different point of view)</li>
+<li>A brief summary of the issue and the fix</li>
+</ol>
+</li>
+<li>Used pivot tables to summarize the results</li>
+</ol>
+<h2 id="limitations"><a class="toclink" href="#limitations">Limitations</a><a class="headerlink" href="#limitations" title="Permanent link">&para;</a></h2>
+<p>What is not represented in this analysis? The above analysis <em>only</em> included the flaky tests that were addressed in 2025. There were likely quite a few more flaky tests that failed intermittently in CI and development machines that were not discussed here. As a result, the generalizations we can draw from this set of tests are limited.</p>
+<h2 id="thank-you"><a class="toclink" href="#thank-you">Thank you!</a><a class="headerlink" href="#thank-you" title="Permanent link">&para;</a></h2>
+<p>Thanks to the following contributors who helped address flaky tests in <a href="https://github.com/cortexproject/cortex">cortex</a> in 2025:</p>
+<ul>
+<li>Harry John (https://github.com/harry671003)</li>
+<li>Charlie Le (https://github.com/CharlieTLe)</li>
+<li>Daniel Sabsay (https://github.com/dsabsay)</li>
+<li>Sungjin Lee (https://github.com/SungJin1212)</li>
+<li>Justin Jung (https://github.com/justinjung04)</li>
+<li>Ben Ye (https://github.com/yeya24)</li>
+</ul>
+</div>
+    </div>
+    <hr class="footer-hr"/>
+    <footer>
+      © 2025 Daniel Sabsay
+    </footer>
+  </div>
+</body>
